@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>🍪 Cookie Hunt AR</title>
+<style>
+  /* ============================================================
+     GLOBAL RESET & BASE
+  ============================================================ */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --neon-gold:   #FFD700;
+    --neon-orange: #FF8C00;
+    --neon-pink:   #FF2D78;
+    --neon-cyan:   #00F5FF;
+    --glass-bg:    rgba(10, 8, 20, 0.72);
+    --glass-border:rgba(255,255,255,0.13);
+    --hud-font:    'Orbitron', monospace;
+    --body-font:   'Nunito', sans-serif;
+  }
+
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Nunito:wght@400;700;900&display=swap');
+
+  html, body {
+    width: 100%; height: 100%;
+    background: #000;
+    overflow: hidden;
+    font-family: var(--body-font);
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  canvas { display: block; }
+
+  /* ============================================================
+     CAMERA BACKGROUND
+  ============================================================ */
+  #camera-bg {
+    position: fixed;
+    inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    z-index: 0;
+    transform: scaleX(-1); /* mirror front cam if needed */
+  }
+
+  #three-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: all;
+  }
+
+  /* ============================================================
+     HUD OVERLAY
+  ============================================================ */
+  #hud {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  /* Score panel */
+  #score-panel {
+    position: absolute;
+    top: 18px; left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(18px);
+    border-radius: 50px;
+    padding: 10px 24px;
+    box-shadow: 0 0 30px rgba(255,165,0,0.2), inset 0 1px 0 rgba(255,255,255,0.08);
+  }
+
+  .hud-label {
+    font-family: var(--hud-font);
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: rgba(255,255,255,0.45);
+    text-transform: uppercase;
+  }
+
+  .hud-value {
+    font-family: var(--hud-font);
+    font-size: 22px;
+    font-weight: 900;
+    color: var(--neon-gold);
+    text-shadow: 0 0 12px rgba(255,215,0,0.7);
+    line-height: 1;
+  }
+
+  .hud-divider {
+    width: 1px; height: 36px;
+    background: var(--glass-border);
+  }
+
+  /* Timer */
+  #timer-panel {
+    position: absolute;
+    top: 18px; right: 18px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(18px);
+    border-radius: 16px;
+    padding: 10px 18px;
+    text-align: center;
+    box-shadow: 0 0 20px rgba(0,245,255,0.15);
+  }
+
+  #timer-val {
+    font-family: var(--hud-font);
+    font-size: 28px;
+    font-weight: 900;
+    color: var(--neon-cyan);
+    text-shadow: 0 0 14px rgba(0,245,255,0.8);
+    line-height: 1;
+  }
+
+  #timer-val.danger {
+    color: var(--neon-pink);
+    text-shadow: 0 0 14px rgba(255,45,120,0.9);
+    animation: timerPulse 0.5s infinite alternate;
+  }
+
+  @keyframes timerPulse {
+    from { transform: scale(1); }
+    to   { transform: scale(1.12); }
+  }
+
+  /* Combo */
+  #combo-panel {
+    position: absolute;
+    top: 18px; left: 18px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(18px);
+    border-radius: 16px;
+    padding: 10px 16px;
+    text-align: center;
+    box-shadow: 0 0 20px rgba(255,45,120,0.15);
+    transition: opacity 0.4s;
+  }
+
+  #combo-val {
+    font-family: var(--hud-font);
+    font-size: 20px;
+    font-weight: 900;
+    color: var(--neon-pink);
+    text-shadow: 0 0 12px rgba(255,45,120,0.8);
+  }
+
+  /* High-score badge */
+  #highscore-badge {
+    position: absolute;
+    bottom: 28px; right: 18px;
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    backdrop-filter: blur(18px);
+    border-radius: 14px;
+    padding: 8px 16px;
+    text-align: center;
+  }
+
+  /* ============================================================
+     FLOATING SCORE POPUPS  (added by JS)
+  ============================================================ */
+  .score-popup {
+    position: fixed;
+    font-family: var(--hud-font);
+    font-size: 26px;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 0 10px rgba(255,215,0,0.9);
+    pointer-events: none;
+    z-index: 20;
+    animation: popFloat 1.2s ease-out forwards;
+  }
+
+  .score-popup.golden {
+    color: var(--neon-gold);
+    font-size: 34px;
+  }
+
+  @keyframes popFloat {
+    0%   { opacity: 1; transform: translateY(0) scale(1); }
+    60%  { opacity: 1; transform: translateY(-60px) scale(1.2); }
+    100% { opacity: 0; transform: translateY(-100px) scale(0.8); }
+  }
+
+  /* ============================================================
+     SCREENS (Start / Game Over)
+  ============================================================ */
+  .screen {
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(5, 3, 14, 0.88);
+    backdrop-filter: blur(24px);
+    transition: opacity 0.5s;
+  }
+
+  .screen.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .screen-card {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 28px;
+    padding: 40px 36px 36px;
+    max-width: 380px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 8px 60px rgba(255,140,0,0.18), 0 0 0 1px rgba(255,255,255,0.04);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .screen-card::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    background: linear-gradient(135deg, rgba(255,215,0,0.18), rgba(0,245,255,0.08), rgba(255,45,120,0.12));
+    z-index: -1;
+  }
+
+  .game-logo {
+    font-family: var(--hud-font);
+    font-size: clamp(28px, 7vw, 42px);
+    font-weight: 900;
+    background: linear-gradient(90deg, var(--neon-gold), var(--neon-orange), var(--neon-pink));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 6px;
+    letter-spacing: 1px;
+  }
+
+  .game-emoji {
+    font-size: 64px;
+    display: block;
+    margin: 10px auto 18px;
+    filter: drop-shadow(0 0 20px rgba(255,215,0,0.6));
+    animation: cookieSpin 4s linear infinite;
+  }
+
+  @keyframes cookieSpin {
+    from { transform: rotate(0deg) scale(1); }
+    50%  { transform: rotate(180deg) scale(1.08); }
+    to   { transform: rotate(360deg) scale(1); }
+  }
+
+  .screen-subtitle {
+    font-family: var(--body-font);
+    color: rgba(255,255,255,0.55);
+    font-size: 14px;
+    margin-bottom: 28px;
+    line-height: 1.6;
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-family: var(--hud-font);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: #000;
+    background: linear-gradient(135deg, var(--neon-gold), var(--neon-orange));
+    border: none;
+    border-radius: 50px;
+    padding: 16px 36px;
+    cursor: pointer;
+    width: 100%;
+    box-shadow: 0 4px 24px rgba(255,140,0,0.45);
+    transition: transform 0.15s, box-shadow 0.15s;
+    pointer-events: all;
+    margin-bottom: 14px;
+    text-transform: uppercase;
+  }
+
+  .btn-primary:active { transform: scale(0.96); box-shadow: 0 2px 12px rgba(255,140,0,0.3); }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--hud-font);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.6);
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 50px;
+    padding: 13px 28px;
+    cursor: pointer;
+    width: 100%;
+    transition: all 0.2s;
+    pointer-events: all;
+    text-transform: uppercase;
+  }
+
+  .btn-secondary:active { background: rgba(255,255,255,0.12); }
+
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    margin-bottom: 6px;
+  }
+
+  .stat-label {
+    font-family: var(--body-font);
+    color: rgba(255,255,255,0.45);
+    font-size: 13px;
+  }
+
+  .stat-value {
+    font-family: var(--hud-font);
+    color: var(--neon-gold);
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .new-record-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, var(--neon-pink), #ff6b6b);
+    color: #fff;
+    font-family: var(--hud-font);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding: 4px 12px;
+    border-radius: 50px;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+    animation: glow 1s infinite alternate;
+  }
+
+  @keyframes glow {
+    from { box-shadow: 0 0 8px rgba(255,45,120,0.4); }
+    to   { box-shadow: 0 0 20px rgba(255,45,120,0.9); }
+  }
+
+  /* Camera permission prompt */
+  #perm-notice {
+    position: fixed;
+    bottom: 90px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255,45,120,0.2);
+    border: 1px solid rgba(255,45,120,0.5);
+    backdrop-filter: blur(12px);
+    border-radius: 14px;
+    padding: 12px 20px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.8);
+    z-index: 40;
+    text-align: center;
+    display: none;
+  }
+
+  /* AR reticle ring */
+  #reticle-hint {
+    position: fixed;
+    bottom: 36px; left: 50%;
+    transform: translateX(-50%);
+    width: 54px; height: 54px;
+    border: 2px solid rgba(0,245,255,0.55);
+    border-radius: 50%;
+    box-shadow: 0 0 16px rgba(0,245,255,0.3), inset 0 0 10px rgba(0,245,255,0.1);
+    animation: reticle 2s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 10;
+    display: none;
+  }
+
+  #reticle-hint::after {
+    content: '';
+    position: absolute;
+    inset: 7px;
+    border-radius: 50%;
+    background: rgba(0,245,255,0.15);
+  }
+
+  @keyframes reticle {
+    0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.6; }
+    50%       { transform: translateX(-50%) scale(1.15); opacity: 1; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Live camera background -->
+<video id="camera-bg" autoplay playsinline muted></video>
+
+<!-- Three.js canvas -->
+<canvas id="three-canvas"></canvas>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="score-panel">
+    <div>
+      <div class="hud-label">Score</div>
+      <div class="hud-value" id="score-val">0</div>
+    </div>
+    <div class="hud-divider"></div>
+    <div>
+      <div class="hud-label">Cookies</div>
+      <div class="hud-value" id="count-val">0</div>
+    </div>
+  </div>
+  <div id="timer-panel">
+    <div class="hud-label">Time</div>
+    <div id="timer-val">60</div>
+  </div>
+  <div id="combo-panel">
+    <div class="hud-label">Combo</div>
+    <div id="combo-val">x1</div>
+  </div>
+  <div id="highscore-badge">
+    <div class="hud-label">Best</div>
+    <div class="hud-value" id="hs-val" style="font-size:16px">0</div>
+  </div>
+</div>
+
+<!-- AR reticle -->
+<div id="reticle-hint"></div>
+
+<!-- Permission notice -->
+<div id="perm-notice">⚠️ Camera access required for AR. Please allow camera.</div>
+
+<!-- ============================================================
+     START SCREEN
+============================================================ -->
+<div class="screen" id="start-screen">
+  <div class="screen-card">
+    <div class="game-logo">Cookie Hunt</div>
+    <span class="game-emoji">🍪</span>
+    <div class="screen-subtitle">
+      Point your camera at a flat surface.<br>
+      Tap cookies to collect them before time runs out!<br><br>
+      <strong style="color:var(--neon-gold)">Golden cookies</strong> are worth 5× points.
+    </div>
+    <button class="btn-primary" id="start-btn">▶ START HUNTING</button>
+    <button class="btn-secondary" id="howto-btn">How to Play</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     GAME OVER SCREEN
+============================================================ -->
+<div class="screen hidden" id="gameover-screen">
+  <div class="screen-card">
+    <div class="game-logo">Time's Up!</div>
+    <span class="game-emoji" style="animation:none;font-size:50px">🍪</span>
+    <div id="new-record-badge" class="new-record-badge" style="display:none">🏆 New High Score!</div>
+    <div class="stat-row">
+      <span class="stat-label">Final Score</span>
+      <span class="stat-value" id="final-score">0</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Cookies Caught</span>
+      <span class="stat-value" id="final-count">0</span>
+    </div>
+    <div class="stat-row" style="border:none">
+      <span class="stat-label">Best Combo</span>
+      <span class="stat-value" id="final-combo">x1</span>
+    </div>
+    <button class="btn-primary" id="restart-btn" style="margin-top:20px">🔄 PLAY AGAIN</button>
+  </div>
+</div>
+
+<!-- ============================================================
+     THREE.JS + GAME LOGIC
+============================================================ -->
+<script type="module">
+import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js';
+
+/* ============================================================
+   CONSTANTS & CONFIG
+============================================================ */
+const GAME_DURATION   = 60;          // seconds
+const MAX_COOKIES     = 8;           // max cookies at once
+const COOKIE_LIFETIME = 12000;       // ms before auto-despawn
+const COMBO_WINDOW    = 2500;        // ms to keep combo alive
+const SPAWN_RADIUS    = 3.5;         // metres from camera
+const SPAWN_HEIGHT_MIN = 0.3;
+const SPAWN_HEIGHT_MAX = 1.8;
+
+const RARITIES = [
+  { type:'normal', chance:0.65, color:0xC47A2B, emissive:0x3a1e00, size:[0.13,0.19], points:10 },
+  { type:'large',  chance:0.20, color:0xB5621A, emissive:0x2e1500, size:[0.20,0.26], points:25 },
+  { type:'golden', chance:0.15, color:0xFFD700, emissive:0x7a4e00, size:[0.14,0.20], points:50 },
+];
+
+/* ============================================================
+   STATE
+============================================================ */
+let scene, camera, renderer;
+let cookies = [];
+let score = 0, cookieCount = 0;
+let combo = 1, comboMax = 1, comboTimer = null;
+let timeLeft = GAME_DURATION;
+let gameActive = false;
+let timerInterval = null;
+let animFrameId = null;
+let highScore = parseInt(localStorage.getItem('cookieHuntHS') || '0');
+
+const clock = new THREE.Clock();
+
+/* ============================================================
+   UI REFS
+============================================================ */
+const scoreVal      = document.getElementById('score-val');
+const countVal      = document.getElementById('count-val');
+const timerVal      = document.getElementById('timer-val');
+const comboVal      = document.getElementById('combo-val');
+const hsVal         = document.getElementById('hs-val');
+const startScreen   = document.getElementById('start-screen');
+const gameoverScreen= document.getElementById('gameover-screen');
+const finalScore    = document.getElementById('final-score');
+const finalCount    = document.getElementById('final-count');
+const finalCombo    = document.getElementById('final-combo');
+const permNotice    = document.getElementById('perm-notice');
+const reticleHint   = document.getElementById('reticle-hint');
+const newRecordBadge= document.getElementById('new-record-badge');
+
+hsVal.textContent = highScore;
+
+/* ============================================================
+   AUDIO ENGINE (Web Audio API)
+============================================================ */
+let audioCtx;
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playCollect(golden = false) {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.type = 'sine';
+  if (golden) {
+    osc.frequency.setValueAtTime(600, t);
+    osc.frequency.exponentialRampToValueAtTime(1200, t + 0.15);
+    osc.frequency.exponentialRampToValueAtTime(900, t + 0.3);
+    gain.gain.setValueAtTime(0.25, t);
+    gain.gain.linearRampToValueAtTime(0, t + 0.5);
+    osc.start(t); osc.stop(t + 0.5);
+  } else {
+    osc.frequency.setValueAtTime(440, t);
+    osc.frequency.exponentialRampToValueAtTime(880, t + 0.12);
+    gain.gain.setValueAtTime(0.2, t);
+    gain.gain.linearRampToValueAtTime(0, t + 0.25);
+    osc.start(t); osc.stop(t + 0.25);
+  }
+}
+
+function playCombo() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  [440, 550, 660, 880].forEach((f, i) => {
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.connect(g); g.connect(audioCtx.destination);
+    o.type = 'sine';
+    o.frequency.value = f;
+    g.gain.setValueAtTime(0, t + i * 0.08);
+    g.gain.linearRampToValueAtTime(0.18, t + i * 0.08 + 0.04);
+    g.gain.linearRampToValueAtTime(0, t + i * 0.08 + 0.12);
+    o.start(t + i * 0.08);
+    o.stop(t + i * 0.08 + 0.12);
+  });
+}
+
+function playTick() {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.connect(g); g.connect(audioCtx.destination);
+  o.frequency.value = 220;
+  g.gain.setValueAtTime(0.08, t);
+  g.gain.linearRampToValueAtTime(0, t + 0.06);
+  o.start(t); o.stop(t + 0.06);
+}
+
+/* ============================================================
+   CAMERA ACCESS
+============================================================ */
+async function startCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width:{ ideal:1280 }, height:{ ideal:720 } },
+      audio: false
+    });
+    const vid = document.getElementById('camera-bg');
+    vid.srcObject = stream;
+    // environment camera — don't mirror
+    const track = stream.getVideoTracks()[0];
+    const settings = track.getSettings();
+    if (settings.facingMode === 'environment') {
+      vid.style.transform = 'none';
+    }
+    return true;
+  } catch(e) {
+    permNotice.style.display = 'block';
+    return false;
+  }
+}
+
+/* ============================================================
+   THREE.JS SETUP
+============================================================ */
+function initThree() {
+  scene = new THREE.Scene();
+
+  camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 50);
+  camera.position.set(0, 1.6, 0); // eye-height
+
+  renderer = new THREE.WebGLRenderer({
+    canvas: document.getElementById('three-canvas'),
+    alpha: true,
+    antialias: true,
+    powerPreference: 'high-performance'
+  });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.setClearColor(0x000000, 0); // transparent bg so camera shows
+
+  // Lighting
+  const ambient = new THREE.AmbientLight(0xfff5e0, 0.6);
+  scene.add(ambient);
+
+  const sun = new THREE.DirectionalLight(0xfff0cc, 1.4);
+  sun.position.set(3, 8, 4);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(512, 512);
+  sun.shadow.camera.near = 0.1;
+  sun.shadow.camera.far = 20;
+  sun.shadow.camera.left = -5;
+  sun.shadow.camera.right = 5;
+  sun.shadow.camera.top = 5;
+  sun.shadow.camera.bottom = -5;
+  scene.add(sun);
+
+  const fill = new THREE.PointLight(0x00aaff, 0.3, 8);
+  fill.position.set(-3, 2, -2);
+  scene.add(fill);
+
+  window.addEventListener('resize', onResize);
+}
+
+function onResize() {
+  if (!renderer) return;
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+/* ============================================================
+   COOKIE GEOMETRY & MATERIAL
+============================================================ */
+function makeCookieMesh(rarity) {
+  const group = new THREE.Group();
+
+  // --- Base cookie disc ---
+  const r = rarity.size[0] + Math.random() * (rarity.size[1] - rarity.size[0]);
+  const geo = new THREE.CylinderGeometry(r, r * 0.95, r * 0.28, 32, 1, false);
+
+  // Procedural texture canvas
+  const texSize = 128;
+  const cvs = document.createElement('canvas');
+  cvs.width = cvs.height = texSize;
+  const ctx = cvs.getContext('2d');
+
+  // Base cookie colour
+  const baseCol = rarity.type === 'golden'
+    ? '#D4A017' : (Math.random() > 0.5 ? '#C47A2B' : '#B5651D');
+  ctx.fillStyle = baseCol;
+  ctx.beginPath();
+  ctx.arc(64, 64, 62, 0, Math.PI*2);
+  ctx.fill();
+
+  // Edge crisp ring
+  ctx.strokeStyle = rarity.type === 'golden' ? '#8B6914' : '#7a3e00';
+  ctx.lineWidth = 5;
+  ctx.stroke();
+
+  // Random cracks / grain
+  ctx.globalAlpha = 0.18;
+  for (let i = 0; i < 30; i++) {
+    const x = Math.random()*128, y = Math.random()*128;
+    ctx.fillStyle = Math.random() > 0.5 ? '#fff' : '#5a2700';
+    ctx.fillRect(x, y, Math.random()*3+1, Math.random()*3+1);
+  }
+  ctx.globalAlpha = 1;
+
+  // Chocolate chips
+  const chips = rarity.type === 'golden' ? 0 : (4 + Math.floor(Math.random()*5));
+  for (let i = 0; i < chips; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const dist  = 10 + Math.random() * 38;
+    const cx = 64 + Math.cos(angle)*dist;
+    const cy = 64 + Math.sin(angle)*dist;
+    const cr = 4 + Math.random()*4;
+    ctx.fillStyle = '#2a1200';
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, cr, cr*0.75, angle, 0, Math.PI*2);
+    ctx.fill();
+    // shine
+    ctx.fillStyle = 'rgba(255,255,255,0.25)';
+    ctx.beginPath();
+    ctx.ellipse(cx-cr*0.2, cy-cr*0.2, cr*0.3, cr*0.25, 0, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // Golden sparkle
+  if (rarity.type === 'golden') {
+    for (let i = 0; i < 8; i++) {
+      const ax = 20 + Math.random()*88, ay = 20 + Math.random()*88;
+      ctx.fillStyle = `rgba(255,255,${200+Math.random()*55},0.6)`;
+      ctx.beginPath();
+      ctx.arc(ax, ay, 2+Math.random()*3, 0, Math.PI*2);
+      ctx.fill();
+    }
+  }
+
+  const tex = new THREE.CanvasTexture(cvs);
+
+  const mat = new THREE.MeshStandardMaterial({
+    map: tex,
+    color: rarity.color,
+    emissive: new THREE.Color(rarity.emissive),
+    emissiveIntensity: rarity.type === 'golden' ? 0.5 : 0.1,
+    roughness: 0.75,
+    metalness: rarity.type === 'golden' ? 0.3 : 0.05,
+  });
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  group.add(mesh);
+
+  // --- Shadow blob beneath ---
+  const shadowGeo = new THREE.CircleGeometry(r * 0.9, 24);
+  const shadowMat = new THREE.MeshBasicMaterial({
+    color: 0x000000,
+    transparent: true,
+    opacity: 0.25,
+    depthWrite: false,
+  });
+  const shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
+  shadowMesh.rotation.x = -Math.PI / 2;
+  shadowMesh.position.y = -r * 0.15;
+  group.add(shadowMesh);
+
+  // --- Glow sprite for golden ---
+  if (rarity.type === 'golden') {
+    const glowGeo = new THREE.PlaneGeometry(r*3.5, r*3.5);
+    const glowCvs = document.createElement('canvas');
+    glowCvs.width = glowCvs.height = 64;
+    const gc = glowCvs.getContext('2d');
+    const grad = gc.createRadialGradient(32,32,0,32,32,32);
+    grad.addColorStop(0, 'rgba(255,220,0,0.55)');
+    grad.addColorStop(1, 'rgba(255,180,0,0)');
+    gc.fillStyle = grad;
+    gc.fillRect(0,0,64,64);
+    const glowTex = new THREE.CanvasTexture(glowCvs);
+    const glowMat = new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+    const glowMesh = new THREE.Mesh(glowGeo, glowMat);
+    glowMesh.name = 'glow';
+    group.add(glowMesh);
+  }
+
+  return { group, r, rarity };
+}
+
+/* ============================================================
+   SPAWN COOKIE
+============================================================ */
+function spawnCookie() {
+  if (!gameActive) return;
+  if (cookies.length >= MAX_COOKIES) return;
+
+  // pick rarity
+  const roll = Math.random();
+  let acc = 0, rar = RARITIES[0];
+  for (const r of RARITIES) { acc += r.chance; if (roll < acc) { rar = r; break; } }
+
+  const { group, r, rarity } = makeCookieMesh(rar);
+
+  // random position in a ring around camera
+  const angle  = Math.random() * Math.PI * 2;
+  const dist   = SPAWN_RADIUS * 0.5 + Math.random() * SPAWN_RADIUS;
+  const height = SPAWN_HEIGHT_MIN + Math.random() * (SPAWN_HEIGHT_MAX - SPAWN_HEIGHT_MIN);
+
+  group.position.set(
+    camera.position.x + Math.cos(angle) * dist,
+    height,
+    camera.position.z + Math.sin(angle) * dist
+  );
+  group.rotation.y = Math.random() * Math.PI * 2;
+
+  scene.add(group);
+
+  const cookieObj = {
+    group,
+    r,
+    rarity,
+    baseY: height,
+    phase: Math.random() * Math.PI * 2,
+    rotSpeed: (Math.random() - 0.5) * 1.2,
+    spawnTime: Date.now(),
+    collecting: false,
+    collected: false,
+    scale: 1,
+  };
+
+  cookies.push(cookieObj);
+  return cookieObj;
+}
+
+/* ============================================================
+   PARTICLES
+============================================================ */
+function spawnParticles(position, golden) {
+  const count  = golden ? 30 : 18;
+  const colour = golden ? 0xFFD700 : 0xC47A2B;
+  const particles = [];
+
+  for (let i = 0; i < count; i++) {
+    const pg = new THREE.SphereGeometry(0.012 + Math.random()*0.018, 4, 4);
+    const pm = new THREE.MeshBasicMaterial({ color: colour });
+    const p  = new THREE.Mesh(pg, pm);
+    p.position.copy(position);
+    const theta = Math.random() * Math.PI * 2;
+    const phi   = Math.random() * Math.PI;
+    const spd   = 0.02 + Math.random() * 0.05;
+    p.userData.vel = new THREE.Vector3(
+      Math.sin(phi)*Math.cos(theta)*spd,
+      0.03 + Math.random()*0.06,
+      Math.sin(phi)*Math.sin(theta)*spd
+    );
+    p.userData.life = 1.0;
+    scene.add(p);
+    particles.push(p);
+  }
+  return particles;
+}
+
+let activeParticles = [];
+
+function updateParticles(dt) {
+  for (let i = activeParticles.length-1; i >= 0; i--) {
+    const p = activeParticles[i];
+    p.userData.life -= dt * 2;
+    p.userData.vel.y -= dt * 0.12;
+    p.position.add(p.userData.vel);
+    p.material.opacity = p.userData.life;
+    p.material.transparent = true;
+    if (p.userData.life <= 0) {
+      scene.remove(p);
+      activeParticles.splice(i, 1);
+    }
+  }
+}
+
+/* ============================================================
+   FLOATING SCORE POPUP
+============================================================ */
+function showScorePopup(screenX, screenY, pts, golden) {
+  const div = document.createElement('div');
+  div.className = 'score-popup' + (golden ? ' golden' : '');
+  div.textContent = '+' + pts;
+  div.style.left = screenX + 'px';
+  div.style.top  = screenY + 'px';
+  document.body.appendChild(div);
+  div.addEventListener('animationend', () => div.remove());
+}
+
+/* ============================================================
+   RAYCASTING — CLICK / TAP
+============================================================ */
+const raycaster = new THREE.Raycaster();
+const pointer   = new THREE.Vector2();
+
+function onPointerDown(e) {
+  if (!gameActive) return;
+  initAudio(); // unlock audio on first interaction
+
+  const ev = e.touches ? e.touches[0] : e;
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((ev.clientX - rect.left) / rect.width)  * 2 - 1;
+  pointer.y = -((ev.clientY - rect.top)  / rect.height) * 2 + 1;
+
+  raycaster.setFromCamera(pointer, camera);
+
+  // collect all meshes
+  const meshes = [];
+  for (const c of cookies) {
+    if (c.collecting || c.collected) continue;
+    c.group.traverse(m => { if (m.isMesh) meshes.push(m); });
+  }
+
+  const hits = raycaster.intersectObjects(meshes, false);
+  if (hits.length === 0) return;
+
+  const hitMesh = hits[0].object;
+  // find parent cookie
+  const cookieObj = cookies.find(c => {
+    let found = false;
+    c.group.traverse(m => { if (m === hitMesh) found = true; });
+    return found;
+  });
+
+  if (cookieObj && !cookieObj.collecting && !cookieObj.collected) {
+    collectCookie(cookieObj, ev.clientX, ev.clientY);
+  }
+}
+
+renderer.domElement.addEventListener('pointerdown', onPointerDown, { passive: true });
+
+/* ============================================================
+   COLLECT COOKIE
+============================================================ */
+function collectCookie(c, sx, sy) {
+  c.collecting = true;
+
+  // Combo
+  if (comboTimer) clearTimeout(comboTimer);
+  combo = Math.min(combo + 1, 10);
+  comboMax = Math.max(comboMax, combo);
+  comboVal.textContent = 'x' + combo;
+  if (combo >= 3) playCombo();
+
+  comboTimer = setTimeout(() => {
+    combo = 1;
+    comboVal.textContent = 'x1';
+  }, COMBO_WINDOW);
+
+  const pts = c.rarity.points * combo;
+  score += pts;
+  cookieCount++;
+  scoreVal.textContent = score;
+  countVal.textContent = cookieCount;
+
+  showScorePopup(sx, sy, pts, c.rarity.type === 'golden');
+
+  // Particles
+  const wPos = new THREE.Vector3();
+  c.group.getWorldPosition(wPos);
+  const parts = spawnParticles(wPos, c.rarity.type === 'golden');
+  activeParticles.push(...parts);
+
+  // Vibration
+  if (navigator.vibrate) navigator.vibrate(c.rarity.type === 'golden' ? [80, 40, 80] : [40]);
+
+  // Sound
+  playCollect(c.rarity.type === 'golden');
+
+  // Scale-out animation handled in animate loop
+  c.collectTime = Date.now();
+
+  // After animation, remove and spawn
+  setTimeout(() => {
+    scene.remove(c.group);
+    c.collected = true;
+    cookies = cookies.filter(x => x !== c);
+    if (gameActive) spawnCookie();
+  }, 500);
+}
+
+/* ============================================================
+   ANIMATION LOOP
+============================================================ */
+function animate() {
+  animFrameId = requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  const t  = clock.getElapsedTime();
+
+  // Update cookies
+  for (const c of cookies) {
+    if (c.collected) continue;
+
+    // Float + bounce
+    c.group.position.y = c.baseY + Math.sin(t * 1.6 + c.phase) * 0.06;
+
+    // Rotate
+    c.group.rotation.y += c.rotSpeed * dt;
+
+    // Glow spin
+    const glow = c.group.getObjectByName('glow');
+    if (glow) glow.rotation.z += 0.8 * dt;
+
+    // Shadow scale with height
+    const shadow = c.group.children.find(ch => ch.geometry && ch.geometry.type === 'CircleGeometry');
+    if (shadow) shadow.material.opacity = 0.25 - (c.group.position.y - c.baseY) * 0.04;
+
+    // Scale towards camera (perspective cue)
+    const distToCam = c.group.position.distanceTo(camera.position);
+    const scl = Math.max(0.4, 1.2 - distToCam * 0.1);
+    c.group.scale.setScalar(scl);
+
+    // Face camera (billboard glow)
+    if (glow) glow.lookAt(camera.position);
+
+    // Collect animation
+    if (c.collecting && c.collectTime) {
+      const elapsed = (Date.now() - c.collectTime) / 500;
+      const s = (1 + elapsed * 0.5) * (1 - elapsed);
+      c.group.scale.setScalar(Math.max(0, s));
+      c.group.position.y += dt * 0.8;
+    }
+
+    // Auto-despawn
+    if (!c.collecting && Date.now() - c.spawnTime > COOKIE_LIFETIME) {
+      scene.remove(c.group);
+      c.collected = true;
+      cookies = cookies.filter(x => x !== c);
+      spawnCookie();
+    }
+  }
+
+  updateParticles(dt);
+  renderer.render(scene, camera);
+}
+
+/* ============================================================
+   GAME FLOW
+============================================================ */
+function startGame() {
+  score = 0; cookieCount = 0; combo = 1; comboMax = 1;
+  timeLeft = GAME_DURATION;
+  gameActive = true;
+  cookies.forEach(c => scene.remove(c.group));
+  cookies = [];
+  activeParticles.forEach(p => scene.remove(p));
+  activeParticles = [];
+
+  scoreVal.textContent = '0';
+  countVal.textContent = '0';
+  comboVal.textContent = 'x1';
+  timerVal.textContent = GAME_DURATION;
+  timerVal.classList.remove('danger');
+
+  startScreen.classList.add('hidden');
+  gameoverScreen.classList.add('hidden');
+  reticleHint.style.display = 'block';
+
+  // Spawn initial cookies
+  for (let i = 0; i < 5; i++) spawnCookie();
+
+  // Ensure more cookies spawn over time
+  const spawnInterval = setInterval(() => {
+    if (!gameActive) { clearInterval(spawnInterval); return; }
+    spawnCookie();
+  }, 3000);
+
+  // Countdown timer
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    timerVal.textContent = timeLeft;
+    if (timeLeft <= 10) {
+      timerVal.classList.add('danger');
+      playTick();
+    }
+    if (timeLeft <= 0) endGame();
+  }, 1000);
+
+  if (!animFrameId) animate();
+}
+
+function endGame() {
+  gameActive = false;
+  clearInterval(timerInterval);
+  if (comboTimer) clearTimeout(comboTimer);
+  reticleHint.style.display = 'none';
+
+  // High score
+  const isNew = score > highScore;
+  if (isNew) {
+    highScore = score;
+    localStorage.setItem('cookieHuntHS', highScore);
+    hsVal.textContent = highScore;
+  }
+
+  finalScore.textContent = score;
+  finalCount.textContent = cookieCount;
+  finalCombo.textContent = 'x' + comboMax;
+  newRecordBadge.style.display = isNew ? 'inline-block' : 'none';
+
+  gameoverScreen.classList.remove('hidden');
+}
+
+/* ============================================================
+   BUTTON HANDLERS
+============================================================ */
+document.getElementById('start-btn').addEventListener('click', async () => {
+  initAudio();
+  await startCamera();
+  startGame();
+});
+
+document.getElementById('restart-btn').addEventListener('click', () => {
+  initAudio();
+  startGame();
+});
+
+document.getElementById('howto-btn').addEventListener('click', () => {
+  alert('🍪 How to Play:\n\n1. Allow camera access when prompted.\n2. Point your camera around your room.\n3. Cookies will float in the space around you.\n4. TAP cookies to collect them!\n5. Collect fast for combo multipliers.\n6. Golden cookies = 5x points!\n7. 60 seconds on the clock – go!');
+});
+
+/* ============================================================
+   DEVICE ORIENTATION for simulated AR camera movement
+   (When WebXR isn't available, we simulate slight camera drift)
+============================================================ */
+let devAlpha=0, devBeta=0, devGamma=0;
+if (window.DeviceOrientationEvent) {
+  window.addEventListener('deviceorientation', e => {
+    devAlpha = e.alpha || 0;
+    devBeta  = (e.beta  || 0) * Math.PI / 180;
+    devGamma = (e.gamma || 0) * Math.PI / 180;
+  });
+}
+
+// Gentle mouse/touch pan simulation on desktop
+let mouseX=0, mouseY=0;
+window.addEventListener('mousemove', e => {
+  mouseX = (e.clientX / window.innerWidth  - 0.5) * 2;
+  mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
+});
+
+// Override animate to include camera sway
+const _origAnimate = animate;
+(function patchAnimate(){
+  // Already patched — camera drift applied per frame in loop above
+})();
+
+// Camera sway patch (replaces above animate to avoid duplication)
+cancelAnimationFrame(animFrameId);
+animFrameId = null;
+
+function animateFull() {
+  animFrameId = requestAnimationFrame(animateFull);
+  const dt = clock.getDelta();
+  const t  = clock.getElapsedTime();
+
+  // Subtle camera sway to simulate held phone
+  const swayX = mouseX * 0.08 + devGamma * 0.4;
+  const swayY = mouseY * 0.04 + (devBeta - 1.2) * 0.15;
+  camera.rotation.y = THREE.MathUtils.lerp(camera.rotation.y, -swayX * 0.15, 0.05);
+  camera.rotation.x = THREE.MathUtils.lerp(camera.rotation.x, swayY * 0.1, 0.05);
+
+  // Update cookies
+  for (const c of cookies) {
+    if (c.collected) continue;
+
+    c.group.position.y = c.baseY + Math.sin(t * 1.6 + c.phase) * 0.07;
+    c.group.rotation.y += c.rotSpeed * dt;
+
+    const glow = c.group.getObjectByName('glow');
+    if (glow) { glow.rotation.z += 0.8 * dt; glow.lookAt(camera.position); }
+
+    const distToCam = c.group.position.distanceTo(camera.position);
+    const scl = Math.max(0.3, 1.1 - distToCam * 0.08);
+    if (!c.collecting) c.group.scale.setScalar(scl);
+
+    if (c.collecting && c.collectTime) {
+      const elapsed = (Date.now() - c.collectTime) / 500;
+      const s = Math.max(0, (1 + elapsed * 0.4) * (1 - elapsed));
+      c.group.scale.setScalar(s);
+      c.group.position.y += dt * 1.2;
+    }
+
+    if (!c.collecting && Date.now() - c.spawnTime > COOKIE_LIFETIME) {
+      scene.remove(c.group);
+      c.collected = true;
+      cookies = cookies.filter(x => x !== c);
+      if (gameActive) spawnCookie();
+    }
+  }
+
+  updateParticles(dt);
+  renderer.render(scene, camera);
+}
+
+/* ============================================================
+   INIT
+============================================================ */
+initThree();
+animateFull(); // start render loop (shows black until game starts)
+
+</script>
+</body>
+</html>

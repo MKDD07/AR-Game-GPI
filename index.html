@@ -5,1220 +5,935 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>🍪 Cookie Hunt AR</title>
 <style>
-  /* ============================================================
-     GLOBAL RESET & BASE
-  ============================================================ */
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+/* ── RESET ───────────────────────────────────────────────── */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --gold:#FFD700;--orange:#FF8C00;--pink:#FF2D78;--cyan:#00F5FF;
+  --glass:rgba(8,6,18,.76);--gb:rgba(255,255,255,.13);
+  --hf:'Orbitron',monospace;--bf:'Nunito',sans-serif;
+}
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Nunito:wght@400;700;900&display=swap');
+html,body{width:100%;height:100%;background:#000;overflow:hidden;
+  font-family:var(--bf);touch-action:none;
+  -webkit-user-select:none;user-select:none}
+canvas{display:block}
 
-  :root {
-    --neon-gold:   #FFD700;
-    --neon-orange: #FF8C00;
-    --neon-pink:   #FF2D78;
-    --neon-cyan:   #00F5FF;
-    --glass-bg:    rgba(10, 8, 20, 0.72);
-    --glass-border:rgba(255,255,255,0.13);
-    --hud-font:    'Orbitron', monospace;
-    --body-font:   'Nunito', sans-serif;
-  }
+/* ── CAMERA & CANVAS ─────────────────────────────────────── */
+#cam{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:0}
+#c3{position:fixed;inset:0;z-index:1;pointer-events:all}
 
-  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Nunito:wght@400;700;900&display=swap');
+/* ── HUD ─────────────────────────────────────────────────── */
+#hud{position:fixed;inset:0;z-index:10;pointer-events:none;display:none}
 
-  html, body {
-    width: 100%; height: 100%;
-    background: #000;
-    overflow: hidden;
-    font-family: var(--body-font);
-    touch-action: none;
-    -webkit-user-select: none;
-    user-select: none;
-  }
+#score-panel{
+  position:absolute;top:16px;left:50%;transform:translateX(-50%);
+  display:flex;gap:12px;align-items:center;
+  background:var(--glass);border:1px solid var(--gb);
+  backdrop-filter:blur(16px);border-radius:50px;padding:9px 22px;
+  box-shadow:0 0 28px rgba(255,165,0,.2)}
+.hl{font-family:var(--hf);font-size:9px;letter-spacing:2px;
+  color:rgba(255,255,255,.4);text-transform:uppercase;margin-bottom:2px}
+.hv{font-family:var(--hf);font-size:21px;font-weight:900;color:var(--gold);
+  text-shadow:0 0 12px rgba(255,215,0,.7);line-height:1}
+.hdiv{width:1px;height:34px;background:var(--gb)}
 
-  canvas { display: block; }
+#timer-panel{
+  position:absolute;top:16px;right:16px;
+  background:var(--glass);border:1px solid var(--gb);
+  backdrop-filter:blur(16px);border-radius:14px;padding:9px 16px;text-align:center;
+  box-shadow:0 0 18px rgba(0,245,255,.15)}
+#tv{font-family:var(--hf);font-size:26px;font-weight:900;
+  color:var(--cyan);text-shadow:0 0 14px rgba(0,245,255,.8);line-height:1;
+  transition:color .3s}
+#tv.danger{color:var(--pink)!important;text-shadow:0 0 14px rgba(255,45,120,.9)!important;
+  animation:tpulse .45s infinite alternate}
+@keyframes tpulse{from{transform:scale(1)}to{transform:scale(1.13)}}
 
-  /* ============================================================
-     CAMERA BACKGROUND
-  ============================================================ */
-  #camera-bg {
-    position: fixed;
-    inset: 0;
-    width: 100%; height: 100%;
-    object-fit: cover;
-    z-index: 0;
-    transform: scaleX(-1); /* mirror front cam if needed */
-  }
+#combo-panel{
+  position:absolute;top:16px;left:16px;
+  background:var(--glass);border:1px solid var(--gb);
+  backdrop-filter:blur(16px);border-radius:14px;padding:9px 14px;text-align:center;
+  box-shadow:0 0 18px rgba(255,45,120,.15)}
+#cv{font-family:var(--hf);font-size:19px;font-weight:900;
+  color:var(--pink);text-shadow:0 0 12px rgba(255,45,120,.8)}
 
-  #three-canvas {
-    position: fixed;
-    inset: 0;
-    z-index: 1;
-    pointer-events: all;
-  }
+#hs-panel{
+  position:absolute;bottom:26px;right:16px;
+  background:var(--glass);border:1px solid var(--gb);
+  backdrop-filter:blur(16px);border-radius:12px;padding:7px 14px;text-align:center}
 
-  /* ============================================================
-     HUD OVERLAY
-  ============================================================ */
-  #hud {
-    position: fixed;
-    inset: 0;
-    z-index: 10;
-    pointer-events: none;
-  }
+/* ── POPUPS ──────────────────────────────────────────────── */
+.popup{
+  position:fixed;font-family:var(--hf);font-size:25px;font-weight:900;
+  color:#fff;text-shadow:0 0 10px rgba(255,215,0,.9);
+  pointer-events:none;z-index:20;transform:translateX(-50%);
+  animation:pfloat 1.1s ease-out forwards}
+.popup.g{color:var(--gold);font-size:32px}
+@keyframes pfloat{
+  0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)}
+  60%{opacity:1;transform:translateX(-50%) translateY(-56px) scale(1.18)}
+  100%{opacity:0;transform:translateX(-50%) translateY(-95px) scale(.8)}}
 
-  /* Score panel */
-  #score-panel {
-    position: absolute;
-    top: 18px; left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 14px;
-    align-items: center;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
-    backdrop-filter: blur(18px);
-    border-radius: 50px;
-    padding: 10px 24px;
-    box-shadow: 0 0 30px rgba(255,165,0,0.2), inset 0 1px 0 rgba(255,255,255,0.08);
-  }
+/* ── SCREENS ─────────────────────────────────────────────── */
+.screen{
+  position:fixed;inset:0;z-index:30;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:rgba(4,2,12,.9);backdrop-filter:blur(22px);transition:opacity .4s}
+.screen.off{opacity:0;pointer-events:none}
+.card{
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.11);
+  border-radius:26px;padding:36px 32px 32px;max-width:370px;width:90%;
+  text-align:center;box-shadow:0 8px 56px rgba(255,140,0,.17);
+  position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;inset:-1px;border-radius:inherit;
+  background:linear-gradient(135deg,rgba(255,215,0,.17),rgba(0,245,255,.07),rgba(255,45,120,.11));
+  z-index:-1}
+.logo{
+  font-family:var(--hf);font-size:clamp(26px,7vw,40px);font-weight:900;
+  background:linear-gradient(90deg,var(--gold),var(--orange),var(--pink));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  margin-bottom:4px;letter-spacing:1px}
+.emoji{font-size:58px;display:block;margin:8px auto 16px;
+  filter:drop-shadow(0 0 18px rgba(255,215,0,.6));animation:cspin 4s linear infinite}
+@keyframes cspin{
+  from{transform:rotate(0) scale(1)}50%{transform:rotate(180deg) scale(1.07)}
+  to{transform:rotate(360deg) scale(1)}}
+.sub{font-family:var(--bf);color:rgba(255,255,255,.52);font-size:13px;
+  margin-bottom:26px;line-height:1.65}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  font-family:var(--hf);font-size:14px;font-weight:700;letter-spacing:1.4px;
+  border:none;border-radius:50px;padding:14px 32px;cursor:pointer;
+  width:100%;transition:transform .13s,box-shadow .13s;
+  pointer-events:all;margin-bottom:12px;text-transform:uppercase}
+.btn-p{color:#000;background:linear-gradient(135deg,var(--gold),var(--orange));
+  box-shadow:0 4px 22px rgba(255,140,0,.42)}
+.btn-p:active{transform:scale(.95);box-shadow:0 2px 10px rgba(255,140,0,.28)}
+.btn-s{color:rgba(255,255,255,.58);background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.14)}
+.btn-s:active{background:rgba(255,255,255,.12)}
+.sr{display:flex;justify-content:space-between;align-items:center;
+  padding:9px 0;border-bottom:1px solid rgba(255,255,255,.07);margin-bottom:4px}
+.sl{font-family:var(--bf);color:rgba(255,255,255,.42);font-size:12px}
+.sv{font-family:var(--hf);color:var(--gold);font-size:17px;font-weight:700}
+.rec{display:inline-block;
+  background:linear-gradient(135deg,var(--pink),#ff6b6b);
+  color:#fff;font-family:var(--hf);font-size:10px;font-weight:700;letter-spacing:1px;
+  padding:3px 10px;border-radius:50px;margin-bottom:14px;text-transform:uppercase;
+  animation:rglow 1s infinite alternate}
+@keyframes rglow{
+  from{box-shadow:0 0 7px rgba(255,45,120,.4)}
+  to{box-shadow:0 0 18px rgba(255,45,120,.9)}}
 
-  .hud-label {
-    font-family: var(--hud-font);
-    font-size: 10px;
-    letter-spacing: 2px;
-    color: rgba(255,255,255,0.45);
-    text-transform: uppercase;
-  }
+/* ── SCAN PHASE ──────────────────────────────────────────── */
+#scan-ui{
+  position:fixed;inset:0;z-index:25;pointer-events:none;
+  display:none;flex-direction:column;align-items:center;justify-content:flex-end;
+  padding-bottom:130px}
+#scan-msg{
+  background:var(--glass);border:1px solid rgba(0,245,255,.35);
+  backdrop-filter:blur(14px);border-radius:16px;padding:11px 22px;text-align:center;
+  box-shadow:0 0 22px rgba(0,245,255,.18)}
+#scan-txt{font-family:var(--hf);font-size:11px;letter-spacing:1.5px;
+  color:var(--cyan);text-shadow:0 0 8px rgba(0,245,255,.7)}
 
-  .hud-value {
-    font-family: var(--hud-font);
-    font-size: 22px;
-    font-weight: 900;
-    color: var(--neon-gold);
-    text-shadow: 0 0 12px rgba(255,215,0,0.7);
-    line-height: 1;
-  }
+#reticle{
+  position:fixed;bottom:108px;left:50%;transform:translateX(-50%);
+  width:60px;height:60px;border:2px solid rgba(0,245,255,.65);border-radius:50%;
+  box-shadow:0 0 18px rgba(0,245,255,.3),inset 0 0 10px rgba(0,245,255,.12);
+  animation:ret 1.8s ease-in-out infinite;z-index:26;pointer-events:none;display:none}
+#reticle::after{content:'';position:absolute;inset:9px;border-radius:50%;
+  background:rgba(0,245,255,.13)}
+@keyframes ret{
+  0%,100%{transform:translateX(-50%) scale(1);opacity:.65}
+  50%{transform:translateX(-50%) scale(1.13);opacity:1}}
 
-  .hud-divider {
-    width: 1px; height: 36px;
-    background: var(--glass-border);
-  }
+#floor-btn{
+  position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
+  font-family:var(--hf);font-size:12px;font-weight:700;letter-spacing:1.3px;
+  color:#000;background:linear-gradient(135deg,var(--cyan),#009aaa);
+  border:none;border-radius:50px;padding:13px 30px;cursor:pointer;
+  box-shadow:0 4px 20px rgba(0,245,255,.4);z-index:27;
+  text-transform:uppercase;display:none}
 
-  /* Timer */
-  #timer-panel {
-    position: absolute;
-    top: 18px; right: 18px;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
-    backdrop-filter: blur(18px);
-    border-radius: 16px;
-    padding: 10px 18px;
-    text-align: center;
-    box-shadow: 0 0 20px rgba(0,245,255,0.15);
-  }
+/* ── VARIANT LEGEND ──────────────────────────────────────── */
+#legend{
+  position:absolute;bottom:26px;left:16px;
+  background:var(--glass);border:1px solid var(--gb);
+  backdrop-filter:blur(14px);border-radius:12px;padding:8px 12px;
+  display:flex;flex-direction:column;gap:4px}
+.leg-row{display:flex;align-items:center;gap:7px;font-family:var(--bf);
+  font-size:10px;color:rgba(255,255,255,.55)}
+.leg-dot{width:10px;height:10px;border-radius:50%}
 
-  #timer-val {
-    font-family: var(--hud-font);
-    font-size: 28px;
-    font-weight: 900;
-    color: var(--neon-cyan);
-    text-shadow: 0 0 14px rgba(0,245,255,0.8);
-    line-height: 1;
-  }
-
-  #timer-val.danger {
-    color: var(--neon-pink);
-    text-shadow: 0 0 14px rgba(255,45,120,0.9);
-    animation: timerPulse 0.5s infinite alternate;
-  }
-
-  @keyframes timerPulse {
-    from { transform: scale(1); }
-    to   { transform: scale(1.12); }
-  }
-
-  /* Combo */
-  #combo-panel {
-    position: absolute;
-    top: 18px; left: 18px;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
-    backdrop-filter: blur(18px);
-    border-radius: 16px;
-    padding: 10px 16px;
-    text-align: center;
-    box-shadow: 0 0 20px rgba(255,45,120,0.15);
-    transition: opacity 0.4s;
-  }
-
-  #combo-val {
-    font-family: var(--hud-font);
-    font-size: 20px;
-    font-weight: 900;
-    color: var(--neon-pink);
-    text-shadow: 0 0 12px rgba(255,45,120,0.8);
-  }
-
-  /* High-score badge */
-  #highscore-badge {
-    position: absolute;
-    bottom: 28px; right: 18px;
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
-    backdrop-filter: blur(18px);
-    border-radius: 14px;
-    padding: 8px 16px;
-    text-align: center;
-  }
-
-  /* ============================================================
-     FLOATING SCORE POPUPS  (added by JS)
-  ============================================================ */
-  .score-popup {
-    position: fixed;
-    font-family: var(--hud-font);
-    font-size: 26px;
-    font-weight: 900;
-    color: #fff;
-    text-shadow: 0 0 10px rgba(255,215,0,0.9);
-    pointer-events: none;
-    z-index: 20;
-    animation: popFloat 1.2s ease-out forwards;
-  }
-
-  .score-popup.golden {
-    color: var(--neon-gold);
-    font-size: 34px;
-  }
-
-  @keyframes popFloat {
-    0%   { opacity: 1; transform: translateY(0) scale(1); }
-    60%  { opacity: 1; transform: translateY(-60px) scale(1.2); }
-    100% { opacity: 0; transform: translateY(-100px) scale(0.8); }
-  }
-
-  /* ============================================================
-     SCREENS (Start / Game Over)
-  ============================================================ */
-  .screen {
-    position: fixed;
-    inset: 0;
-    z-index: 30;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    background: rgba(5, 3, 14, 0.88);
-    backdrop-filter: blur(24px);
-    transition: opacity 0.5s;
-  }
-
-  .screen.hidden {
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  .screen-card {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 28px;
-    padding: 40px 36px 36px;
-    max-width: 380px;
-    width: 90%;
-    text-align: center;
-    box-shadow: 0 8px 60px rgba(255,140,0,0.18), 0 0 0 1px rgba(255,255,255,0.04);
-    position: relative;
-    overflow: hidden;
-  }
-
-  .screen-card::before {
-    content: '';
-    position: absolute;
-    inset: -1px;
-    border-radius: inherit;
-    background: linear-gradient(135deg, rgba(255,215,0,0.18), rgba(0,245,255,0.08), rgba(255,45,120,0.12));
-    z-index: -1;
-  }
-
-  .game-logo {
-    font-family: var(--hud-font);
-    font-size: clamp(28px, 7vw, 42px);
-    font-weight: 900;
-    background: linear-gradient(90deg, var(--neon-gold), var(--neon-orange), var(--neon-pink));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin-bottom: 6px;
-    letter-spacing: 1px;
-  }
-
-  .game-emoji {
-    font-size: 64px;
-    display: block;
-    margin: 10px auto 18px;
-    filter: drop-shadow(0 0 20px rgba(255,215,0,0.6));
-    animation: cookieSpin 4s linear infinite;
-  }
-
-  @keyframes cookieSpin {
-    from { transform: rotate(0deg) scale(1); }
-    50%  { transform: rotate(180deg) scale(1.08); }
-    to   { transform: rotate(360deg) scale(1); }
-  }
-
-  .screen-subtitle {
-    font-family: var(--body-font);
-    color: rgba(255,255,255,0.55);
-    font-size: 14px;
-    margin-bottom: 28px;
-    line-height: 1.6;
-  }
-
-  .btn-primary {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    font-family: var(--hud-font);
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: 1.5px;
-    color: #000;
-    background: linear-gradient(135deg, var(--neon-gold), var(--neon-orange));
-    border: none;
-    border-radius: 50px;
-    padding: 16px 36px;
-    cursor: pointer;
-    width: 100%;
-    box-shadow: 0 4px 24px rgba(255,140,0,0.45);
-    transition: transform 0.15s, box-shadow 0.15s;
-    pointer-events: all;
-    margin-bottom: 14px;
-    text-transform: uppercase;
-  }
-
-  .btn-primary:active { transform: scale(0.96); box-shadow: 0 2px 12px rgba(255,140,0,0.3); }
-
-  .btn-secondary {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-family: var(--hud-font);
-    font-size: 13px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    color: rgba(255,255,255,0.6);
-    background: rgba(255,255,255,0.07);
-    border: 1px solid rgba(255,255,255,0.15);
-    border-radius: 50px;
-    padding: 13px 28px;
-    cursor: pointer;
-    width: 100%;
-    transition: all 0.2s;
-    pointer-events: all;
-    text-transform: uppercase;
-  }
-
-  .btn-secondary:active { background: rgba(255,255,255,0.12); }
-
-  .stat-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.07);
-    margin-bottom: 6px;
-  }
-
-  .stat-label {
-    font-family: var(--body-font);
-    color: rgba(255,255,255,0.45);
-    font-size: 13px;
-  }
-
-  .stat-value {
-    font-family: var(--hud-font);
-    color: var(--neon-gold);
-    font-size: 18px;
-    font-weight: 700;
-  }
-
-  .new-record-badge {
-    display: inline-block;
-    background: linear-gradient(135deg, var(--neon-pink), #ff6b6b);
-    color: #fff;
-    font-family: var(--hud-font);
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 1px;
-    padding: 4px 12px;
-    border-radius: 50px;
-    margin-bottom: 16px;
-    text-transform: uppercase;
-    animation: glow 1s infinite alternate;
-  }
-
-  @keyframes glow {
-    from { box-shadow: 0 0 8px rgba(255,45,120,0.4); }
-    to   { box-shadow: 0 0 20px rgba(255,45,120,0.9); }
-  }
-
-  /* Camera permission prompt */
-  #perm-notice {
-    position: fixed;
-    bottom: 90px; left: 50%;
-    transform: translateX(-50%);
-    background: rgba(255,45,120,0.2);
-    border: 1px solid rgba(255,45,120,0.5);
-    backdrop-filter: blur(12px);
-    border-radius: 14px;
-    padding: 12px 20px;
-    font-size: 13px;
-    color: rgba(255,255,255,0.8);
-    z-index: 40;
-    text-align: center;
-    display: none;
-  }
-
-  /* AR reticle ring */
-  #reticle-hint {
-    position: fixed;
-    bottom: 36px; left: 50%;
-    transform: translateX(-50%);
-    width: 54px; height: 54px;
-    border: 2px solid rgba(0,245,255,0.55);
-    border-radius: 50%;
-    box-shadow: 0 0 16px rgba(0,245,255,0.3), inset 0 0 10px rgba(0,245,255,0.1);
-    animation: reticle 2s ease-in-out infinite;
-    pointer-events: none;
-    z-index: 10;
-    display: none;
-  }
-
-  #reticle-hint::after {
-    content: '';
-    position: absolute;
-    inset: 7px;
-    border-radius: 50%;
-    background: rgba(0,245,255,0.15);
-  }
-
-  @keyframes reticle {
-    0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.6; }
-    50%       { transform: translateX(-50%) scale(1.15); opacity: 1; }
-  }
+#perm{
+  position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+  background:rgba(255,45,120,.2);border:1px solid rgba(255,45,120,.5);
+  backdrop-filter:blur(12px);border-radius:12px;padding:11px 18px;
+  font-size:12px;color:rgba(255,255,255,.8);z-index:40;
+  text-align:center;display:none}
 </style>
 </head>
 <body>
 
-<!-- Live camera background -->
-<video id="camera-bg" autoplay playsinline muted></video>
-
-<!-- Three.js canvas -->
-<canvas id="three-canvas"></canvas>
+<video id="cam" autoplay playsinline muted></video>
+<canvas id="c3"></canvas>
 
 <!-- HUD -->
 <div id="hud">
   <div id="score-panel">
-    <div>
-      <div class="hud-label">Score</div>
-      <div class="hud-value" id="score-val">0</div>
-    </div>
-    <div class="hud-divider"></div>
-    <div>
-      <div class="hud-label">Cookies</div>
-      <div class="hud-value" id="count-val">0</div>
-    </div>
+    <div><div class="hl">Score</div><div class="hv" id="sv">0</div></div>
+    <div class="hdiv"></div>
+    <div><div class="hl">Caught</div><div class="hv" id="cc">0</div></div>
   </div>
-  <div id="timer-panel">
-    <div class="hud-label">Time</div>
-    <div id="timer-val">60</div>
-  </div>
-  <div id="combo-panel">
-    <div class="hud-label">Combo</div>
-    <div id="combo-val">x1</div>
-  </div>
-  <div id="highscore-badge">
-    <div class="hud-label">Best</div>
-    <div class="hud-value" id="hs-val" style="font-size:16px">0</div>
+  <div id="timer-panel"><div class="hl">Time</div><div id="tv">60</div></div>
+  <div id="combo-panel"><div class="hl">Combo</div><div id="cv">x1</div></div>
+  <div id="hs-panel"><div class="hl">Best</div><div class="hv" id="hsv" style="font-size:15px">0</div></div>
+  <div id="legend">
+    <div class="leg-row"><div class="leg-dot" style="background:#C47A2B"></div>Classic · 10pts</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#222"></div>Oreo · 18pts</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#F5A0B0"></div>Sugar · 22pts</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#B8E0A8"></div>Macaron · 30pts</div>
+    <div class="leg-row"><div class="leg-dot" style="background:#FFD700"></div>Golden · 50pts</div>
   </div>
 </div>
 
-<!-- AR reticle -->
-<div id="reticle-hint"></div>
+<!-- Scan UI -->
+<div id="scan-ui">
+  <div id="scan-msg"><div id="scan-txt">POINT CAMERA AT FLAT SURFACE</div></div>
+</div>
+<div id="reticle"></div>
+<button id="floor-btn">✓ SET FLOOR HERE</button>
 
-<!-- Permission notice -->
-<div id="perm-notice">⚠️ Camera access required for AR. Please allow camera.</div>
+<div id="perm">⚠️ Camera access required for AR.</div>
 
-<!-- ============================================================
-     START SCREEN
-============================================================ -->
-<div class="screen" id="start-screen">
-  <div class="screen-card">
-    <div class="game-logo">Cookie Hunt</div>
-    <span class="game-emoji">🍪</span>
-    <div class="screen-subtitle">
-      Point your camera at a flat surface.<br>
-      Tap cookies to collect them before time runs out!<br><br>
-      <strong style="color:var(--neon-gold)">Golden cookies</strong> are worth 5× points.
+<!-- START SCREEN -->
+<div class="screen" id="ss">
+  <div class="card">
+    <div class="logo">Cookie Hunt AR</div>
+    <span class="emoji">🍪</span>
+    <div class="sub">
+      Allow camera → point at a <strong style="color:var(--cyan)">table or floor</strong><br>
+      → tap <em>Set Floor Here</em> → cookies appear!<br><br>
+      5 cookie types · combo multiplier · 60 seconds<br>
+      <strong style="color:var(--gold)">Golden = 50 pts × combo!</strong>
     </div>
-    <button class="btn-primary" id="start-btn">▶ START HUNTING</button>
-    <button class="btn-secondary" id="howto-btn">How to Play</button>
+    <button class="btn btn-p" id="start-btn">▶ START HUNTING</button>
+    <button class="btn btn-s" id="howto-btn">How to Play</button>
   </div>
 </div>
 
-<!-- ============================================================
-     GAME OVER SCREEN
-============================================================ -->
-<div class="screen hidden" id="gameover-screen">
-  <div class="screen-card">
-    <div class="game-logo">Time's Up!</div>
-    <span class="game-emoji" style="animation:none;font-size:50px">🍪</span>
-    <div id="new-record-badge" class="new-record-badge" style="display:none">🏆 New High Score!</div>
-    <div class="stat-row">
-      <span class="stat-label">Final Score</span>
-      <span class="stat-value" id="final-score">0</span>
-    </div>
-    <div class="stat-row">
-      <span class="stat-label">Cookies Caught</span>
-      <span class="stat-value" id="final-count">0</span>
-    </div>
-    <div class="stat-row" style="border:none">
-      <span class="stat-label">Best Combo</span>
-      <span class="stat-value" id="final-combo">x1</span>
-    </div>
-    <button class="btn-primary" id="restart-btn" style="margin-top:20px">🔄 PLAY AGAIN</button>
+<!-- GAME OVER -->
+<div class="screen off" id="gos">
+  <div class="card">
+    <div class="logo">Time's Up!</div>
+    <span class="emoji" style="animation:none;font-size:46px">🍪</span>
+    <div id="rec" class="rec" style="display:none">🏆 New High Score!</div>
+    <div class="sr"><span class="sl">Final Score</span><span class="sv" id="fs">0</span></div>
+    <div class="sr"><span class="sl">Cookies Caught</span><span class="sv" id="fc">0</span></div>
+    <div class="sr" style="border:none"><span class="sl">Best Combo</span><span class="sv" id="fco">x1</span></div>
+    <button class="btn btn-p" id="restart-btn" style="margin-top:18px">🔄 PLAY AGAIN</button>
   </div>
 </div>
 
-<!-- ============================================================
-     THREE.JS + GAME LOGIC
-============================================================ -->
 <script type="module">
 import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js';
 
-/* ============================================================
-   CONSTANTS & CONFIG
-============================================================ */
-const GAME_DURATION   = 30;          // seconds
-const MAX_COOKIES     = 12;           // max cookies at once
-const COOKIE_LIFETIME = 1200;       // ms before auto-despawn
-const COMBO_WINDOW    = 2500;        // ms to keep combo alive
-const SPAWN_RADIUS    = 4.5;         // metres from camera
-const SPAWN_HEIGHT_MIN = 0.3;
-const SPAWN_HEIGHT_MAX = 1.8;
+/* ══════════════════════════════════════════════════════════
+   CONFIG
+══════════════════════════════════════════════════════════ */
+const GAME_SECS      = 60;
+const MAX_COOKIES    = 9;
+const COOKIE_LIFE    = 12000;
+const COMBO_WIN      = 2600;
+const SPAWN_RADIUS   = 2.6;
+const SPAWN_INTERVAL = 2600;
 
-const RARITIES = [
-  { type:'normal', chance:0.65, color:0xC47A2B, emissive:0x3a1e00, size:[0.13,0.19], points:10 },
-  { type:'large',  chance:0.20, color:0xB5621A, emissive:0x2e1500, size:[0.20,0.26], points:25 },
-  { type:'golden', chance:0.15, color:0xFFD700, emissive:0x7a4e00, size:[0.14,0.20], points:50 },
+/* ══════════════════════════════════════════════════════════
+   COOKIE VARIANTS  (5 distinct types)
+══════════════════════════════════════════════════════════ */
+const VARIANTS = [
+  /* 0 ── Classic Chocolate Chip ────────────────────────── */
+  {
+    id:'classic', label:'Classic Chip', chance:.30, points:10,
+    size:[.13,.17], emissive:0x000000, emissiveI:0,
+    rough:.73, metal:.04,
+    draw(ctx,w){
+      radialFill(ctx,w,'#D4882E','#9B5A1A');
+      edgeRing(ctx,w,'#5c2e00',3.5);
+      addGrain(ctx,w,30,'#3a1800',.14);
+      drawChips(ctx,w,7,'#1e0c00','#2c1200');
+    }
+  },
+  /* 1 ── Dark Oreo ─────────────────────────────────────── */
+  {
+    id:'oreo', label:'Dark Oreo', chance:.22, points:18,
+    size:[.11,.14], emissive:0x000000, emissiveI:0,
+    rough:.55, metal:.06,
+    draw(ctx,w){
+      radialFill(ctx,w,'#1c0f0a','#0a0604');
+      edgeRing(ctx,w,'#050302',3);
+      // white embossed pattern
+      const cx=w/2, cy=w/2;
+      ctx.strokeStyle='rgba(255,255,255,.18)';
+      ctx.lineWidth=1.8;
+      for(let i=0;i<8;i++){
+        const a=i*Math.PI/4;
+        ctx.beginPath();ctx.moveTo(cx,cy);
+        ctx.lineTo(cx+Math.cos(a)*w*.38,cy+Math.sin(a)*w*.38);ctx.stroke();
+      }
+      for(let ri=1;ri<=2;ri++){
+        ctx.beginPath();ctx.arc(cx,cy,w*.14*ri,0,Math.PI*2);ctx.stroke();
+      }
+      addGrain(ctx,w,8,'#fff',.06);
+    }
+  },
+  /* 2 ── Sugar Star (pink with sprinkles) ──────────────── */
+  {
+    id:'sugar', label:'Sugar Star', chance:.20, points:22,
+    size:[.13,.16], emissive:0x110000, emissiveI:.05,
+    rough:.68, metal:.03,
+    draw(ctx,w){
+      radialFill(ctx,w,'#F7CCC0','#E8A090');
+      edgeRing(ctx,w,'#c06050',3);
+      addGrain(ctx,w,18,'#fff',.18);
+      // colorful sprinkles (tiny rects at angles)
+      const sc=['#FF6B8A','#4ECDC4','#FFD93D','#6BCB77','#845EC2','#FF9671'];
+      for(let i=0;i<20;i++){
+        const a=Math.random()*Math.PI*2;
+        const d=5+Math.random()*w*.33;
+        const sx=w/2+Math.cos(a)*d, sy=w/2+Math.sin(a)*d;
+        ctx.save();ctx.translate(sx,sy);ctx.rotate(a);
+        ctx.fillStyle=sc[i%sc.length];
+        ctx.fillRect(-1.2,-4.5,2.4,9);
+        ctx.restore();
+      }
+    }
+  },
+  /* 3 ── Macaron ───────────────────────────────────────── */
+  {
+    id:'macaron', label:'Macaron', chance:.15, points:30,
+    size:[.11,.14], emissive:0x002200, emissiveI:.08,
+    rough:.6, metal:.05,
+    draw(ctx,w){
+      radialFill(ctx,w,'#C2EAB0','#88C870');
+      edgeRing(ctx,w,'#5a9040',3);
+      // pied (ruffled foot)
+      const cx=w/2,cy=w/2,r=w*.44;
+      for(let i=0;i<28;i++){
+        const a=i*Math.PI/14;
+        ctx.fillStyle=i%2===0?'rgba(255,255,255,.3)':'rgba(100,180,80,.25)';
+        ctx.beginPath();ctx.arc(cx+Math.cos(a)*r,cy+Math.sin(a)*r,2.8,0,Math.PI*2);ctx.fill();
+      }
+      // cream band
+      ctx.fillStyle='rgba(255,245,210,.45)';
+      ctx.fillRect(w*.12,w*.4,w*.76,w*.18);
+      edgeRing(ctx,w,'rgba(100,180,80,.3)',1);
+      addGrain(ctx,w,8,'#fff',.12);
+    }
+  },
+  /* 4 ── Golden Cookie ─────────────────────────────────── */
+  {
+    id:'golden', label:'Golden Cookie', chance:.13, points:50,
+    size:[.14,.18], emissive:0x4a2e00, emissiveI:.4,
+    rough:.38, metal:.32,
+    draw(ctx,w){
+      const cx=w/2,cy=w/2;
+      const grd=ctx.createRadialGradient(cx*.8,cy*.7,2,cx,cy,w/2);
+      grd.addColorStop(0,'#FFEE88');
+      grd.addColorStop(.5,'#D4A017');
+      grd.addColorStop(1,'#8B6000');
+      ctx.fillStyle=grd;
+      ctx.beginPath();ctx.arc(cx,cy,w/2-1,0,Math.PI*2);ctx.fill();
+      edgeRing(ctx,w,'#7a4e00',3);
+      // star rays
+      ctx.strokeStyle='rgba(255,240,130,.28)';ctx.lineWidth=1.4;
+      for(let i=0;i<14;i++){
+        const a=i*Math.PI/7;
+        ctx.beginPath();ctx.moveTo(cx,cy);
+        ctx.lineTo(cx+Math.cos(a)*w*.47,cy+Math.sin(a)*w*.47);ctx.stroke();
+      }
+      // sparkle dots
+      for(let i=0;i<10;i++){
+        const a=Math.random()*Math.PI*2, d=5+Math.random()*w*.38;
+        ctx.fillStyle=`rgba(255,255,${180+Math.random()*75},.7)`;
+        ctx.beginPath();ctx.arc(w/2+Math.cos(a)*d,w/2+Math.sin(a)*d,1.5+Math.random()*2,0,Math.PI*2);
+        ctx.fill();
+      }
+      addGrain(ctx,w,6,'#fff',.22);
+    }
+  }
 ];
 
-/* ============================================================
+/* ── Texture helpers ─────────────────────────────────────── */
+function radialFill(ctx,w,inner,outer){
+  const grd=ctx.createRadialGradient(w*.42,w*.38,2,w/2,w/2,w/2);
+  grd.addColorStop(0,inner);grd.addColorStop(1,outer);
+  ctx.fillStyle=grd;
+  ctx.beginPath();ctx.arc(w/2,w/2,w/2-1,0,Math.PI*2);ctx.fill();
+}
+function edgeRing(ctx,w,col,lw){
+  ctx.strokeStyle=col;ctx.lineWidth=lw;
+  ctx.beginPath();ctx.arc(w/2,w/2,w/2-lw/2-1,0,Math.PI*2);ctx.stroke();
+}
+function addGrain(ctx,w,n,col,alpha){
+  ctx.globalAlpha=alpha;
+  for(let i=0;i<n;i++){
+    ctx.fillStyle=col;
+    ctx.fillRect(Math.random()*w,Math.random()*w,Math.random()*3+1,Math.random()*2+1);
+  }
+  ctx.globalAlpha=1;
+}
+function drawChips(ctx,w,n,dark){
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2, d=8+Math.random()*w*.35;
+    const cx=w/2+Math.cos(a)*d, cy=w/2+Math.sin(a)*d;
+    const cr=3.5+Math.random()*3.5;
+    ctx.fillStyle=dark;
+    ctx.beginPath();ctx.ellipse(cx,cy,cr,cr*.7,a,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.2)';
+    ctx.beginPath();ctx.ellipse(cx-cr*.2,cy-cr*.2,cr*.28,cr*.22,0,0,Math.PI*2);ctx.fill();
+  }
+}
+
+function makeTexture(v){
+  const w=128, cv=document.createElement('canvas');
+  cv.width=cv.height=w;
+  v.draw(cv.getContext('2d'),w);
+  return new THREE.CanvasTexture(cv);
+}
+
+/* ── TOP texture (top face of the cylinder) ──────────────── */
+function makeTopTexture(v){
+  const w=128, cv=document.createElement('canvas');
+  cv.width=cv.height=w;
+  v.draw(cv.getContext('2d'),w);
+  return new THREE.CanvasTexture(cv);
+}
+
+/* ── Side texture (plain baked edge) ─────────────────────── */
+function makeSideTexture(v){
+  const w=128, h=32, cv=document.createElement('canvas');
+  cv.width=w;cv.height=h;
+  const ctx=cv.getContext('2d');
+  // slightly darker than the top base color
+  const sideColMap={classic:'#9B5A1A',oreo:'#0d0806',sugar:'#D08878',macaron:'#7aB060',golden:'#A07010'};
+  ctx.fillStyle=sideColMap[v.id]||'#888';
+  ctx.fillRect(0,0,w,h);
+  addGrain(ctx,w,10,'#000',.12);
+  return new THREE.CanvasTexture(cv);
+}
+
+/* ══════════════════════════════════════════════════════════
    STATE
-============================================================ */
-let scene, camera, renderer;
-let cookies = [];
-let score = 0, cookieCount = 0;
-let combo = 1, comboMax = 1, comboTimer = null;
-let timeLeft = GAME_DURATION;
-let gameActive = false;
-let timerInterval = null;
-let animFrameId = null;
-let highScore = parseInt(localStorage.getItem('cookieHuntHS') || '0');
+══════════════════════════════════════════════════════════ */
+let scene, cam3, renderer, clock;
+let cookies=[], particles=[];
+let score=0, caught=0, combo=1, comboMax=1, comboTimer=null;
+let gameActive=false, scanPhase=false;
+let floorY=0, floorSet=false;
+let timerStart=0, timeLeft=GAME_SECS;
+let spawnId=null, rafTimer=null, animId=null;
+let highScore=parseInt(localStorage.getItem('cookieHuntHS')||'0');
 
-const clock = new THREE.Clock();
+/* ── Orientation ─────────────────────────────────────────── */
+const orientQ=new THREE.Quaternion();
+let orientOK=false;
+// Correction: device orientation zero = landscape, we need portrait
+const ORIENT_CORRECT=new THREE.Quaternion().setFromEuler(
+  new THREE.Euler(-Math.PI/2,0,0));
 
-/* ============================================================
-   UI REFS
-============================================================ */
-const scoreVal      = document.getElementById('score-val');
-const countVal      = document.getElementById('count-val');
-const timerVal      = document.getElementById('timer-val');
-const comboVal      = document.getElementById('combo-val');
-const hsVal         = document.getElementById('hs-val');
-const startScreen   = document.getElementById('start-screen');
-const gameoverScreen= document.getElementById('gameover-screen');
-const finalScore    = document.getElementById('final-score');
-const finalCount    = document.getElementById('final-count');
-const finalCombo    = document.getElementById('final-combo');
-const permNotice    = document.getElementById('perm-notice');
-const reticleHint   = document.getElementById('reticle-hint');
-const newRecordBadge= document.getElementById('new-record-badge');
-
-hsVal.textContent = highScore;
-
-/* ============================================================
-   AUDIO ENGINE (Web Audio API)
-============================================================ */
-let audioCtx;
-
-function initAudio() {
-  if (audioCtx) return;
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-}
-
-function playCollect(golden = false) {
-  if (!audioCtx) return;
-  const t = audioCtx.currentTime;
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-  osc.connect(gain); gain.connect(audioCtx.destination);
-  osc.type = 'sine';
-  if (golden) {
-    osc.frequency.setValueAtTime(600, t);
-    osc.frequency.exponentialRampToValueAtTime(1200, t + 0.15);
-    osc.frequency.exponentialRampToValueAtTime(900, t + 0.3);
-    gain.gain.setValueAtTime(0.25, t);
-    gain.gain.linearRampToValueAtTime(0, t + 0.5);
-    osc.start(t); osc.stop(t + 0.5);
-  } else {
-    osc.frequency.setValueAtTime(440, t);
-    osc.frequency.exponentialRampToValueAtTime(880, t + 0.12);
-    gain.gain.setValueAtTime(0.2, t);
-    gain.gain.linearRampToValueAtTime(0, t + 0.25);
-    osc.start(t); osc.stop(t + 0.25);
-  }
-}
-
-function playCombo() {
-  if (!audioCtx) return;
-  const t = audioCtx.currentTime;
-  [440, 550, 660, 880].forEach((f, i) => {
-    const o = audioCtx.createOscillator();
-    const g = audioCtx.createGain();
-    o.connect(g); g.connect(audioCtx.destination);
-    o.type = 'sine';
-    o.frequency.value = f;
-    g.gain.setValueAtTime(0, t + i * 0.08);
-    g.gain.linearRampToValueAtTime(0.18, t + i * 0.08 + 0.04);
-    g.gain.linearRampToValueAtTime(0, t + i * 0.08 + 0.12);
-    o.start(t + i * 0.08);
-    o.stop(t + i * 0.08 + 0.12);
-  });
-}
-
-function playTick() {
-  if (!audioCtx) return;
-  const t = audioCtx.currentTime;
-  const o = audioCtx.createOscillator();
-  const g = audioCtx.createGain();
-  o.connect(g); g.connect(audioCtx.destination);
-  o.frequency.value = 220;
-  g.gain.setValueAtTime(0.08, t);
-  g.gain.linearRampToValueAtTime(0, t + 0.06);
-  o.start(t); o.stop(t + 0.06);
-}
-
-/* ============================================================
-   CAMERA ACCESS
-============================================================ */
-async function startCamera() {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width:{ ideal:1280 }, height:{ ideal:720 } },
-      audio: false
-    });
-    const vid = document.getElementById('camera-bg');
-    vid.srcObject = stream;
-    // environment camera — don't mirror
-    const track = stream.getVideoTracks()[0];
-    const settings = track.getSettings();
-    if (settings.facingMode === 'environment') {
-      vid.style.transform = 'none';
-    }
-    return true;
-  } catch(e) {
-    permNotice.style.display = 'block';
-    return false;
-  }
-}
-
-/* ============================================================
-   THREE.JS SETUP
-============================================================ */
-function initThree() {
-  scene = new THREE.Scene();
-
-  camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 50);
-  camera.position.set(0, 1.6, 0); // eye-height
-
-  renderer = new THREE.WebGLRenderer({
-    canvas: document.getElementById('three-canvas'),
-    alpha: true,
-    antialias: true,
-    powerPreference: 'high-performance'
-  });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.setClearColor(0x000000, 0); // transparent bg so camera shows
-
-  // Lighting
-  const ambient = new THREE.AmbientLight(0xfff5e0, 0.6);
-  scene.add(ambient);
-
-  const sun = new THREE.DirectionalLight(0xfff0cc, 1.4);
-  sun.position.set(3, 8, 4);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(512, 512);
-  sun.shadow.camera.near = 0.1;
-  sun.shadow.camera.far = 20;
-  sun.shadow.camera.left = -5;
-  sun.shadow.camera.right = 5;
-  sun.shadow.camera.top = 5;
-  sun.shadow.camera.bottom = -5;
-  scene.add(sun);
-
-  const fill = new THREE.PointLight(0x00aaff, 0.3, 8);
-  fill.position.set(-3, 2, -2);
-  scene.add(fill);
-
-  window.addEventListener('resize', onResize);
-
-  // Register pointer/tap handler now that renderer.domElement exists
-  renderer.domElement.addEventListener('pointerdown', onPointerDown, { passive: true });
-}
-
-function onResize() {
-  if (!renderer) return;
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-}
-
-/* ============================================================
-   COOKIE GEOMETRY & MATERIAL
-============================================================ */
-function makeCookieMesh(rarity) {
-  const group = new THREE.Group();
-
-  // --- Base cookie disc ---
-  const r = rarity.size[0] + Math.random() * (rarity.size[1] - rarity.size[0]);
-  const geo = new THREE.CylinderGeometry(r, r * 2, r * 0.5, 32, 1, false);
-
-  // Procedural texture canvas
-  const texSize = 128;
-  const cvs = document.createElement('canvas');
-  cvs.width = cvs.height = texSize;
-  const ctx = cvs.getContext('2d');
-
-  // Base cookie colour
-  const baseCol = rarity.type === 'golden'
-    ? '#D4A017' : (Math.random() > 0.5 ? '#C47A2B' : '#B5651D');
-  ctx.fillStyle = baseCol;
-  ctx.beginPath();
-  ctx.arc(64, 64, 62, 0, Math.PI*2);
-  ctx.fill();
-
-  // Edge crisp ring
-  ctx.strokeStyle = rarity.type === 'golden' ? '#8B6914' : '#7a3e00';
-  ctx.lineWidth = 5;
-  ctx.stroke();
-
-  // Random cracks / grain
-  ctx.globalAlpha = 0.18;
-  for (let i = 0; i < 30; i++) {
-    const x = Math.random()*128, y = Math.random()*128;
-    ctx.fillStyle = Math.random() > 0.5 ? '#fff' : '#5a2700';
-    ctx.fillRect(x, y, Math.random()*3+1, Math.random()*3+1);
-  }
-  ctx.globalAlpha = 1;
-
-  // Chocolate chips
-  const chips = rarity.type === 'golden' ? 0 : (4 + Math.floor(Math.random()*5));
-  for (let i = 0; i < chips; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const dist  = 10 + Math.random() * 38;
-    const cx = 64 + Math.cos(angle)*dist;
-    const cy = 64 + Math.sin(angle)*dist;
-    const cr = 4 + Math.random()*4;
-    ctx.fillStyle = '#2a1200';
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, cr, cr*0.75, angle, 0, Math.PI*2);
-    ctx.fill();
-    // shine
-    ctx.fillStyle = 'rgba(255,255,255,0.25)';
-    ctx.beginPath();
-    ctx.ellipse(cx-cr*0.2, cy-cr*0.2, cr*0.3, cr*0.25, 0, 0, Math.PI*2);
-    ctx.fill();
-  }
-
-  // Golden sparkle
-  if (rarity.type === 'golden') {
-    for (let i = 0; i < 8; i++) {
-      const ax = 20 + Math.random()*88, ay = 20 + Math.random()*88;
-      ctx.fillStyle = `rgba(255,255,${200+Math.random()*55},0.6)`;
-      ctx.beginPath();
-      ctx.arc(ax, ay, 2+Math.random()*3, 0, Math.PI*2);
-      ctx.fill();
-    }
-  }
-
-  const tex = new THREE.CanvasTexture(cvs);
-
-  const mat = new THREE.MeshStandardMaterial({
-    map: tex,
-    color: rarity.color,
-    emissive: new THREE.Color(rarity.emissive),
-    emissiveIntensity: rarity.type === 'golden' ? 0.5 : 0.1,
-    roughness: 0.75,
-    metalness: rarity.type === 'golden' ? 0.3 : 0.05,
-  });
-
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  group.add(mesh);
-
-  // --- Shadow blob beneath ---
-  const shadowGeo = new THREE.CircleGeometry(r * 0.9, 24);
-  const shadowMat = new THREE.MeshBasicMaterial({
-    color: 0x000000,
-    transparent: true,
-    opacity: 0.25,
-    depthWrite: false,
-  });
-  const shadowMesh = new THREE.Mesh(shadowGeo, shadowMat);
-  shadowMesh.rotation.x = -Math.PI / 2;
-  shadowMesh.position.y = -r * 0.15;
-  group.add(shadowMesh);
-
-  // --- Glow sprite for golden ---
-  if (rarity.type === 'golden') {
-    const glowGeo = new THREE.PlaneGeometry(r*3.5, r*3.5);
-    const glowCvs = document.createElement('canvas');
-    glowCvs.width = glowCvs.height = 64;
-    const gc = glowCvs.getContext('2d');
-    const grad = gc.createRadialGradient(32,32,0,32,32,32);
-    grad.addColorStop(0, 'rgba(255,220,0,0.55)');
-    grad.addColorStop(1, 'rgba(255,180,0,0)');
-    gc.fillStyle = grad;
-    gc.fillRect(0,0,64,64);
-    const glowTex = new THREE.CanvasTexture(glowCvs);
-    const glowMat = new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, depthWrite: false, side: THREE.DoubleSide });
-    const glowMesh = new THREE.Mesh(glowGeo, glowMat);
-    glowMesh.name = 'glow';
-    group.add(glowMesh);
-  }
-
-  return { group, r, rarity };
-}
-
-/* ============================================================
-   SPAWN COOKIE
-============================================================ */
-function spawnCookie() {
-  if (!gameActive) return;
-  if (cookies.length >= MAX_COOKIES) return;
-
-  // pick rarity
-  const roll = Math.random();
-  let acc = 0, rar = RARITIES[0];
-  for (const r of RARITIES) { acc += r.chance; if (roll < acc) { rar = r; break; } }
-
-  const { group, r, rarity } = makeCookieMesh(rar);
-
-  // random position in a ring around camera
-  const angle  = Math.random() * Math.PI * 2;
-  const dist   = SPAWN_RADIUS * 0.5 + Math.random() * SPAWN_RADIUS;
-  const height = SPAWN_HEIGHT_MIN + Math.random() * (SPAWN_HEIGHT_MAX - SPAWN_HEIGHT_MIN);
-
-  group.position.set(
-    camera.position.x + Math.cos(angle) * dist,
-    height,
-    camera.position.z + Math.sin(angle) * dist
+function onOrient(e){
+  if(e.alpha==null) return;
+  orientOK=true;
+  const a=(e.alpha||0)*Math.PI/180;
+  const b=(e.beta ||0)*Math.PI/180;
+  const g=(e.gamma||0)*Math.PI/180;
+  // ZXY Euler → quaternion (standard device orientation conversion)
+  const cA=Math.cos(a/2),sA=Math.sin(a/2);
+  const cB=Math.cos(b/2),sB=Math.sin(b/2);
+  const cG=Math.cos(g/2),sG=Math.sin(g/2);
+  orientQ.set(
+    sB*cG*cA - cB*sG*sA,
+    cB*sG*cA + sB*cG*sA,
+    cB*cG*sA - sB*sG*cA,
+    cB*cG*cA + sB*sG*sA
   );
-  group.rotation.y = Math.random() * Math.PI * 2;
+  orientQ.multiply(ORIENT_CORRECT);
+}
+window.addEventListener('deviceorientation', onOrient);
 
+/* ══════════════════════════════════════════════════════════
+   AUDIO
+══════════════════════════════════════════════════════════ */
+let actx;
+function initAudio(){if(!actx)actx=new(window.AudioContext||window.webkitAudioContext)();}
+function tone(f,dur,vol=.16,type='sine',delay=0){
+  if(!actx)return;
+  const o=actx.createOscillator(),g=actx.createGain();
+  o.connect(g);g.connect(actx.destination);
+  o.type=type;o.frequency.value=f;
+  const t=actx.currentTime+delay;
+  g.gain.setValueAtTime(vol,t);g.gain.linearRampToValueAtTime(0,t+dur);
+  o.start(t);o.stop(t+dur);
+}
+function playCollect(golden){
+  if(golden){tone(600,.07,.2);tone(900,.07,.18,undefined,.09);tone(1200,.2,.15,undefined,.18);}
+  else{tone(440,.06,.16);tone(660,.14,.13,undefined,.08);}
+}
+function playComboSound(){[330,440,550,660,880].forEach((f,i)=>tone(f,.11,.13,undefined,i*.07));}
+function playTick(){tone(200,.055,.07,'square');}
+function playFloor(){tone(440,.05,.14);tone(880,.14,.11,undefined,.07);}
+
+/* ══════════════════════════════════════════════════════════
+   CAMERA (device camera, not THREE camera)
+══════════════════════════════════════════════════════════ */
+async function startCam(){
+  try{
+    const st=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false});
+    const v=document.getElementById('cam');
+    v.srcObject=st;
+    const s=st.getVideoTracks()[0].getSettings();
+    v.style.transform=(s.facingMode==='environment')?'none':'scaleX(-1)';
+    return true;
+  }catch(e){document.getElementById('perm').style.display='block';return false;}
+}
+
+/* ══════════════════════════════════════════════════════════
+   THREE INIT
+══════════════════════════════════════════════════════════ */
+function initThree(){
+  clock=new THREE.Clock();
+  scene=new THREE.Scene();
+
+  cam3=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.005,60);
+  cam3.position.set(0,1.5,0);
+
+  renderer=new THREE.WebGLRenderer({
+    canvas:document.getElementById('c3'),alpha:true,
+    antialias:true,powerPreference:'high-performance'});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(innerWidth,innerHeight);
+  renderer.shadowMap.enabled=true;
+  renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+  renderer.setClearColor(0,0);
+
+  // Lights
+  scene.add(new THREE.AmbientLight(0xfff8e8,.75));
+  const sun=new THREE.DirectionalLight(0xfff0cc,1.6);
+  sun.position.set(4,10,5);sun.castShadow=true;
+  sun.shadow.mapSize.set(512,512);
+  Object.assign(sun.shadow.camera,{near:.05,far:25,left:-7,right:7,top:7,bottom:-7});
+  scene.add(sun);
+  scene.add(Object.assign(new THREE.PointLight(0x4488ff,.3,12),{position:new THREE.Vector3(-4,3,-3)}));
+
+  // Invisible floor (shadow receiver)
+  const fp=new THREE.Mesh(
+    new THREE.PlaneGeometry(20,20),
+    new THREE.ShadowMaterial({opacity:.15,transparent:true}));
+  fp.rotation.x=-Math.PI/2;fp.receiveShadow=true;fp.name='floorPlane';
+  scene.add(fp);
+
+  // Scan grid
+  const grid=new THREE.GridHelper(6,.4,0x00F5FF,0x00F5FF);
+  grid.material.opacity=.22;grid.material.transparent=true;
+  grid.name='floorGrid';grid.visible=false;scene.add(grid);
+
+  window.addEventListener('resize',()=>{
+    cam3.aspect=innerWidth/innerHeight;cam3.updateProjectionMatrix();
+    renderer.setSize(innerWidth,innerHeight);});
+
+  renderer.domElement.addEventListener('pointerdown',onTap,{passive:true});
+}
+
+function updateFloor(y){
+  floorY=y;floorSet=true;
+  scene.getObjectByName('floorPlane').position.y=y;
+  scene.getObjectByName('floorGrid').position.y=y;
+}
+
+/* ══════════════════════════════════════════════════════════
+   BUILD COOKIE MESH  (per-face UVs for top/side)
+══════════════════════════════════════════════════════════ */
+function buildCookie(variant){
+  const r=variant.size[0]+Math.random()*(variant.size[1]-variant.size[0]);
+  const group=new THREE.Group();group.userData.r=r;
+
+  // CylinderGeometry: groups 0=side,1=top cap,2=bottom cap
+  const geo=new THREE.CylinderGeometry(r,r*.93,r*.27,36,1,false);
+  const topTex=makeTopTexture(variant);
+  const sideTex=makeSideTexture(variant);
+
+  const mats=[
+    new THREE.MeshStandardMaterial({map:sideTex,roughness:.78,metalness:.04}),
+    new THREE.MeshStandardMaterial({map:topTex, roughness:variant.rough, metalness:variant.metal,
+      emissive:new THREE.Color(variant.emissive), emissiveIntensity:variant.emissiveI}),
+    new THREE.MeshStandardMaterial({map:sideTex,roughness:.78,metalness:.04}),
+  ];
+  const disc=new THREE.Mesh(geo,mats);
+  disc.castShadow=true;disc.receiveShadow=true;group.add(disc);
+
+  // Bevel torus
+  const bGeo=new THREE.TorusGeometry(r*.97,.011,8,36);
+  const bvCol={classic:0x5c2e00,oreo:0x050302,sugar:0xb05040,macaron:0x5a9040,golden:0x7a4e00};
+  const bMat=new THREE.MeshStandardMaterial({color:bvCol[variant.id]||0x444444,roughness:.8,metalness:.04});
+  const bv=new THREE.Mesh(bGeo,bMat);bv.rotation.x=Math.PI/2;group.add(bv);
+
+  // Shadow blob
+  const sm=new THREE.Mesh(
+    new THREE.CircleGeometry(r*.9,24),
+    new THREE.MeshBasicMaterial({color:0,transparent:true,opacity:.2,depthWrite:false}));
+  sm.rotation.x=-Math.PI/2;sm.position.y=-r*.14;sm.name='shadow';group.add(sm);
+
+  // Glow billboard (golden + macaron)
+  if(variant.id==='golden'||variant.id==='macaron'){
+    const gc=document.createElement('canvas');gc.width=gc.height=64;
+    const gx=gc.getContext('2d');
+    const gcol=variant.id==='golden'?[255,200,0]:[100,220,100];
+    const grd=gx.createRadialGradient(32,32,0,32,32,32);
+    grd.addColorStop(0,`rgba(${gcol},.55)`);
+    grd.addColorStop(1,`rgba(${gcol},0)`);
+    gx.fillStyle=grd;gx.fillRect(0,0,64,64);
+    const gm=new THREE.Mesh(
+      new THREE.PlaneGeometry(r*3.4,r*3.4),
+      new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(gc),transparent:true,depthWrite:false,side:THREE.DoubleSide}));
+    gm.name='glow';group.add(gm);
+  }
+
+  return {group,r,variant};
+}
+
+/* ══════════════════════════════════════════════════════════
+   SPAWN WITH COLLISION AVOIDANCE
+══════════════════════════════════════════════════════════ */
+function pickVariant(){
+  const roll=Math.random();let acc=0;
+  for(const v of VARIANTS){acc+=v.chance;if(roll<acc)return v;}
+  return VARIANTS[0];
+}
+
+function spawnCookie(){
+  if(!gameActive||cookies.length>=MAX_COOKIES)return;
+  const variant=pickVariant();
+  const {group,r}=buildCookie(variant);
+
+  let pos=null;
+  for(let t=0;t<15;t++){
+    const angle=Math.random()*Math.PI*2;
+    const dist=.7+Math.random()*SPAWN_RADIUS;
+    const candidate=new THREE.Vector3(
+      cam3.position.x+Math.cos(angle)*dist,
+      floorY+r*.14+.005,
+      cam3.position.z+Math.sin(angle)*dist);
+    const minD=r*2.2+.06;
+    if(cookies.every(c=>{
+      const dx=c.group.position.x-candidate.x;
+      const dz=c.group.position.z-candidate.z;
+      return Math.sqrt(dx*dx+dz*dz)>minD;
+    })){pos=candidate;break;}
+  }
+  if(!pos)return;
+
+  group.position.copy(pos);
+  group.rotation.y=Math.random()*Math.PI*2;
+  // Cookies lie flat on the surface (tilt slightly random)
+  group.rotation.x=(Math.random()-.5)*.12;
+  group.rotation.z=(Math.random()-.5)*.12;
   scene.add(group);
 
-  const cookieObj = {
-    group,
-    r,
-    rarity,
-    baseY: height,
-    phase: Math.random() * Math.PI * 2,
-    rotSpeed: (Math.random() - 0.5) * 1.2,
-    spawnTime: Date.now(),
-    collecting: false,
-    collected: false,
-    scale: 1,
-  };
-
-  cookies.push(cookieObj);
-  return cookieObj;
+  cookies.push({group,r,variant,
+    baseY:pos.y, phase:Math.random()*Math.PI*2,
+    rotSpeed:(.25+Math.random()*.6)*(Math.random()<.5?1:-1),
+    spawnTime:Date.now(), collecting:false, collected:false, collectTime:0});
 }
 
-/* ============================================================
+/* ══════════════════════════════════════════════════════════
    PARTICLES
-============================================================ */
-function spawnParticles(position, golden) {
-  const count  = golden ? 30 : 18;
-  const colour = golden ? 0xFFD700 : 0xC47A2B;
-  const particles = [];
-
-  for (let i = 0; i < count; i++) {
-    const pg = new THREE.SphereGeometry(0.012 + Math.random()*0.018, 4, 4);
-    const pm = new THREE.MeshBasicMaterial({ color: colour });
-    const p  = new THREE.Mesh(pg, pm);
-    p.position.copy(position);
-    const theta = Math.random() * Math.PI * 2;
-    const phi   = Math.random() * Math.PI;
-    const spd   = 0.02 + Math.random() * 0.05;
-    p.userData.vel = new THREE.Vector3(
-      Math.sin(phi)*Math.cos(theta)*spd,
-      0.03 + Math.random()*0.06,
-      Math.sin(phi)*Math.sin(theta)*spd
-    );
-    p.userData.life = 1.0;
-    scene.add(p);
-    particles.push(p);
+══════════════════════════════════════════════════════════ */
+const PART_COLS={
+  classic:[0xC47A2B,0xFFE0A0,0x8B4513],
+  oreo:[0xffffff,0xcccccc,0x888888],
+  sugar:[0xFF6B8A,0xFFD93D,0x6BCB77,0x845EC2],
+  macaron:[0xC2EAB0,0xffffff,0x88C870],
+  golden:[0xFFD700,0xFFF0AA,0xFF8C00]
+};
+function spawnParticles(pos,variant){
+  const cols=PART_COLS[variant.id]||[0xffffff];
+  const n=variant.id==='golden'?32:20;
+  for(let i=0;i<n;i++){
+    const p=new THREE.Mesh(
+      new THREE.SphereGeometry(.007+Math.random()*.013,4,4),
+      new THREE.MeshBasicMaterial({color:cols[i%cols.length]}));
+    p.position.copy(pos);
+    const th=Math.random()*Math.PI*2,ph=Math.random()*Math.PI;
+    const sp=.012+Math.random()*.042;
+    p.userData={
+      vel:new THREE.Vector3(Math.sin(ph)*Math.cos(th)*sp,.018+Math.random()*.055,Math.sin(ph)*Math.sin(th)*sp),
+      life:1};
+    scene.add(p);particles.push(p);
   }
-  return particles;
 }
-
-let activeParticles = [];
-
-function updateParticles(dt) {
-  for (let i = activeParticles.length-1; i >= 0; i--) {
-    const p = activeParticles[i];
-    p.userData.life -= dt * 2;
-    p.userData.vel.y -= dt * 0.12;
+function updateParticles(dt){
+  for(let i=particles.length-1;i>=0;i--){
+    const p=particles[i];
+    p.userData.life-=dt*2.4;
+    p.userData.vel.y-=dt*.2;
     p.position.add(p.userData.vel);
-    p.material.opacity = p.userData.life;
-    p.material.transparent = true;
-    if (p.userData.life <= 0) {
-      scene.remove(p);
-      activeParticles.splice(i, 1);
+    p.material.opacity=p.userData.life;
+    p.material.transparent=true;
+    if(p.userData.life<=0){scene.remove(p);particles.splice(i,1);}
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   SCORE POPUP
+══════════════════════════════════════════════════════════ */
+function showPopup(x,y,pts,golden){
+  const d=document.createElement('div');
+  d.className='popup'+(golden?' g':'');
+  d.textContent='+'+pts;
+  d.style.left=x+'px';d.style.top=y+'px';
+  document.body.appendChild(d);
+  d.addEventListener('animationend',()=>d.remove());
+}
+
+/* ══════════════════════════════════════════════════════════
+   TAP / CLICK
+══════════════════════════════════════════════════════════ */
+const ray=new THREE.Raycaster();
+const ptr=new THREE.Vector2();
+function onTap(e){
+  initAudio();
+  const ev=e.touches?e.touches[0]:e;
+  const rect=renderer.domElement.getBoundingClientRect();
+  ptr.x=((ev.clientX-rect.left)/rect.width)*2-1;
+  ptr.y=-((ev.clientY-rect.top)/rect.height)*2+1;
+  ray.setFromCamera(ptr,cam3);
+  if(!gameActive)return;
+  const meshes=[];
+  cookies.forEach(c=>{if(!c.collecting&&!c.collected)c.group.traverse(m=>{if(m.isMesh)meshes.push(m);});});
+  const hits=ray.intersectObjects(meshes,false);
+  if(!hits.length)return;
+  const hit=hits[0].object;
+  const c=cookies.find(ck=>{let f=false;ck.group.traverse(m=>{if(m===hit)f=true;});return f;});
+  if(c&&!c.collecting&&!c.collected)collectCookie(c,ev.clientX,ev.clientY);
+}
+
+/* ══════════════════════════════════════════════════════════
+   COLLECT
+══════════════════════════════════════════════════════════ */
+function collectCookie(c,sx,sy){
+  c.collecting=true;initAudio();
+  if(comboTimer)clearTimeout(comboTimer);
+  combo=Math.min(combo+1,10);comboMax=Math.max(comboMax,combo);
+  document.getElementById('cv').textContent='x'+combo;
+  if(combo>=3)playComboSound();
+  comboTimer=setTimeout(()=>{combo=1;document.getElementById('cv').textContent='x1';},COMBO_WIN);
+
+  const pts=c.variant.points*combo;
+  score+=pts;caught++;
+  document.getElementById('sv').textContent=score;
+  document.getElementById('cc').textContent=caught;
+  showPopup(sx,sy,pts,c.variant.id==='golden');
+
+  const wp=new THREE.Vector3();c.group.getWorldPosition(wp);
+  spawnParticles(wp,c.variant);
+  if(navigator.vibrate)navigator.vibrate(c.variant.id==='golden'?[75,35,75]:[30]);
+  playCollect(c.variant.id==='golden');
+  c.collectTime=performance.now();
+
+  setTimeout(()=>{
+    scene.remove(c.group);c.collected=true;
+    cookies=cookies.filter(x=>x!==c);
+    if(gameActive)spawnCookie();
+  },460);
+}
+
+/* ══════════════════════════════════════════════════════════
+   WALL-CLOCK TIMER  — accurate to the millisecond
+   Uses performance.now() delta, NOT setInterval drift
+══════════════════════════════════════════════════════════ */
+let lastTickDisp=-1;
+function tickTimer(){
+  if(!gameActive)return;
+  const elapsed=(performance.now()-timerStart)/1000;
+  timeLeft=Math.max(0,GAME_SECS-elapsed);
+  const dispSec=Math.ceil(timeLeft);            // display value (60..1..0)
+  const tvEl=document.getElementById('tv');
+
+  if(dispSec!==lastTickDisp){                   // only redraw on integer change
+    lastTickDisp=dispSec;
+    tvEl.textContent=dispSec;
+    if(dispSec<=10){tvEl.classList.add('danger');playTick();}
+    else tvEl.classList.remove('danger');
+  }
+
+  if(timeLeft<=0){endGame();return;}
+  rafTimer=requestAnimationFrame(tickTimer);
+}
+
+/* ══════════════════════════════════════════════════════════
+   RENDER LOOP
+══════════════════════════════════════════════════════════ */
+let _mX=0,_mY=0;
+window.addEventListener('mousemove',e=>{_mX=(e.clientX/innerWidth-.5)*2;_mY=(e.clientY/innerHeight-.5)*2;});
+
+function renderLoop(){
+  animId=requestAnimationFrame(renderLoop);
+  const dt=Math.min(clock.getDelta(),.05);
+  const t=clock.getElapsedTime();
+
+  /* ── Camera from device orientation ─────────────────── */
+  if(orientOK){
+    cam3.quaternion.slerp(orientQ,.12);
+  } else {
+    // Desktop: gentle mouse sway
+    cam3.rotation.y+=(_mX*.1-cam3.rotation.y)*.06;
+    cam3.rotation.x+=(_mY*.06-cam3.rotation.x)*.06;
+  }
+
+  /* ── Cookie animation ────────────────────────────────── */
+  const toRemove=[];
+  for(const c of cookies){
+    if(c.collected)continue;
+    if(c.collecting&&c.collectTime){
+      const p=(performance.now()-c.collectTime)/460;
+      c.group.scale.setScalar(Math.max(0,(1+p*.4)*(1-p)));
+      c.group.position.y+=dt*1.5;
+      continue;
     }
+    // Gentle float ON the surface (small amplitude)
+    c.group.position.y=c.baseY+Math.sin(t*1.4+c.phase)*.022;
+    c.group.rotation.y+=c.rotSpeed*dt;
+
+    // Glow billboard
+    const glow=c.group.getObjectByName('glow');
+    if(glow){glow.rotation.z+=.65*dt;glow.lookAt(cam3.position);}
+
+    // Shadow
+    const sh=c.group.getObjectByName('shadow');
+    if(sh)sh.material.opacity=.2-Math.sin(t*1.4+c.phase)*.022*.025;
+
+    // Distance scale
+    const dist=c.group.position.distanceTo(cam3.position);
+    c.group.scale.setScalar(Math.max(.3,1-dist*.055));
+
+    if(Date.now()-c.spawnTime>COOKIE_LIFE)toRemove.push(c);
   }
-}
-
-/* ============================================================
-   FLOATING SCORE POPUP
-============================================================ */
-function showScorePopup(screenX, screenY, pts, golden) {
-  const div = document.createElement('div');
-  div.className = 'score-popup' + (golden ? ' golden' : '');
-  div.textContent = '+' + pts;
-  div.style.left = screenX + 'px';
-  div.style.top  = screenY + 'px';
-  document.body.appendChild(div);
-  div.addEventListener('animationend', () => div.remove());
-}
-
-/* ============================================================
-   RAYCASTING — CLICK / TAP
-============================================================ */
-const raycaster = new THREE.Raycaster();
-const pointer   = new THREE.Vector2();
-
-function onPointerDown(e) {
-  if (!gameActive) return;
-  initAudio(); // unlock audio on first interaction
-
-  const ev = e.touches ? e.touches[0] : e;
-  const rect = renderer.domElement.getBoundingClientRect();
-  pointer.x = ((ev.clientX - rect.left) / rect.width)  * 2 - 1;
-  pointer.y = -((ev.clientY - rect.top)  / rect.height) * 2 + 1;
-
-  raycaster.setFromCamera(pointer, camera);
-
-  // collect all meshes
-  const meshes = [];
-  for (const c of cookies) {
-    if (c.collecting || c.collected) continue;
-    c.group.traverse(m => { if (m.isMesh) meshes.push(m); });
-  }
-
-  const hits = raycaster.intersectObjects(meshes, false);
-  if (hits.length === 0) return;
-
-  const hitMesh = hits[0].object;
-  // find parent cookie
-  const cookieObj = cookies.find(c => {
-    let found = false;
-    c.group.traverse(m => { if (m === hitMesh) found = true; });
-    return found;
+  toRemove.forEach(c=>{
+    scene.remove(c.group);c.collected=true;
+    cookies=cookies.filter(x=>x!==c);
+    if(gameActive)spawnCookie();
   });
 
-  if (cookieObj && !cookieObj.collecting && !cookieObj.collected) {
-    collectCookie(cookieObj, ev.clientX, ev.clientY);
-  }
-}
-
-// NOTE: pointerdown listener is registered in initThree(), after renderer is created.
-
-/* ============================================================
-   COLLECT COOKIE
-============================================================ */
-function collectCookie(c, sx, sy) {
-  c.collecting = true;
-
-  // Combo
-  if (comboTimer) clearTimeout(comboTimer);
-  combo = Math.min(combo + 1, 10);
-  comboMax = Math.max(comboMax, combo);
-  comboVal.textContent = 'x' + combo;
-  if (combo >= 3) playCombo();
-
-  comboTimer = setTimeout(() => {
-    combo = 1;
-    comboVal.textContent = 'x1';
-  }, COMBO_WINDOW);
-
-  const pts = c.rarity.points * combo;
-  score += pts;
-  cookieCount++;
-  scoreVal.textContent = score;
-  countVal.textContent = cookieCount;
-
-  showScorePopup(sx, sy, pts, c.rarity.type === 'golden');
-
-  // Particles
-  const wPos = new THREE.Vector3();
-  c.group.getWorldPosition(wPos);
-  const parts = spawnParticles(wPos, c.rarity.type === 'golden');
-  activeParticles.push(...parts);
-
-  // Vibration
-  if (navigator.vibrate) navigator.vibrate(c.rarity.type === 'golden' ? [80, 40, 80] : [40]);
-
-  // Sound
-  playCollect(c.rarity.type === 'golden');
-
-  // Scale-out animation handled in animate loop
-  c.collectTime = Date.now();
-
-  // After animation, remove and spawn
-  setTimeout(() => {
-    scene.remove(c.group);
-    c.collected = true;
-    cookies = cookies.filter(x => x !== c);
-    if (gameActive) spawnCookie();
-  }, 500);
-}
-
-/* ============================================================
-   ANIMATION LOOP
-============================================================ */
-function animate() {
-  animFrameId = requestAnimationFrame(animate);
-  const dt = clock.getDelta();
-  const t  = clock.getElapsedTime();
-
-  // Update cookies
-  for (const c of cookies) {
-    if (c.collected) continue;
-
-    // Float + bounce
-    c.group.position.y = c.baseY + Math.sin(t * 1.6 + c.phase) * 0.06;
-
-    // Rotate
-    c.group.rotation.y += c.rotSpeed * dt;
-
-    // Glow spin
-    const glow = c.group.getObjectByName('glow');
-    if (glow) glow.rotation.z += 0.8 * dt;
-
-    // Shadow scale with height
-    const shadow = c.group.children.find(ch => ch.geometry && ch.geometry.type === 'CircleGeometry');
-    if (shadow) shadow.material.opacity = 0.25 - (c.group.position.y - c.baseY) * 0.04;
-
-    // Scale towards camera (perspective cue)
-    const distToCam = c.group.position.distanceTo(camera.position);
-    const scl = Math.max(0.4, 1.2 - distToCam * 0.1);
-    c.group.scale.setScalar(scl);
-
-    // Face camera (billboard glow)
-    if (glow) glow.lookAt(camera.position);
-
-    // Collect animation
-    if (c.collecting && c.collectTime) {
-      const elapsed = (Date.now() - c.collectTime) / 500;
-      const s = (1 + elapsed * 0.5) * (1 - elapsed);
-      c.group.scale.setScalar(Math.max(0, s));
-      c.group.position.y += dt * 0.8;
-    }
-
-    // Auto-despawn
-    if (!c.collecting && Date.now() - c.spawnTime > COOKIE_LIFETIME) {
-      scene.remove(c.group);
-      c.collected = true;
-      cookies = cookies.filter(x => x !== c);
-      spawnCookie();
-    }
-  }
-
   updateParticles(dt);
-  renderer.render(scene, camera);
+  renderer.render(scene,cam3);
 }
 
-/* ============================================================
+/* ══════════════════════════════════════════════════════════
+   SCAN PHASE UI
+══════════════════════════════════════════════════════════ */
+function enterScan(){
+  scanPhase=true;
+  document.getElementById('scan-ui').style.display='flex';
+  document.getElementById('reticle').style.display='block';
+  document.getElementById('floor-btn').style.display='block';
+  scene.getObjectByName('floorGrid').visible=true;
+
+  document.getElementById('floor-btn').onclick=()=>{
+    // Estimate floor = camera Y - typical eye height
+    const fy=cam3.position.y-1.35;
+    updateFloor(fy);
+    playFloor();
+    document.getElementById('scan-ui').style.display='none';
+    document.getElementById('reticle').style.display='none';
+    document.getElementById('floor-btn').style.display='none';
+    scene.getObjectByName('floorGrid').visible=false;
+    scanPhase=false;
+    beginGameplay();
+  };
+}
+
+/* ══════════════════════════════════════════════════════════
    GAME FLOW
-============================================================ */
-function startGame() {
-  score = 0; cookieCount = 0; combo = 1; comboMax = 1;
-  timeLeft = GAME_DURATION;
-  gameActive = true;
-  cookies.forEach(c => scene.remove(c.group));
-  cookies = [];
-  activeParticles.forEach(p => scene.remove(p));
-  activeParticles = [];
-
-  scoreVal.textContent = '0';
-  countVal.textContent = '0';
-  comboVal.textContent = 'x1';
-  timerVal.textContent = GAME_DURATION;
-  timerVal.classList.remove('danger');
-
-  startScreen.classList.add('hidden');
-  gameoverScreen.classList.add('hidden');
-  reticleHint.style.display = 'block';
-
-  // Spawn initial cookies
-  for (let i = 0; i < 5; i++) spawnCookie();
-
-  // Ensure more cookies spawn over time
-  const spawnInterval = setInterval(() => {
-    if (!gameActive) { clearInterval(spawnInterval); return; }
-    spawnCookie();
-  }, 3000);
-
-  // Countdown timer
-  timerInterval = setInterval(() => {
-    timeLeft--;
-    timerVal.textContent = timeLeft;
-    if (timeLeft <= 10) {
-      timerVal.classList.add('danger');
-      playTick();
-    }
-    if (timeLeft <= 0) endGame();
-  }, 1000);
-
-  if (!animFrameId) animate();
-}
-
-function endGame() {
-  gameActive = false;
-  clearInterval(timerInterval);
-  if (comboTimer) clearTimeout(comboTimer);
-  reticleHint.style.display = 'none';
-
-  // High score
-  const isNew = score > highScore;
-  if (isNew) {
-    highScore = score;
-    localStorage.setItem('cookieHuntHS', highScore);
-    hsVal.textContent = highScore;
+══════════════════════════════════════════════════════════ */
+async function startGame(){
+  // iOS 13+ permission for DeviceOrientation
+  if(typeof DeviceOrientationEvent!=='undefined'&&
+     typeof DeviceOrientationEvent.requestPermission==='function'){
+    try{
+      const r=await DeviceOrientationEvent.requestPermission();
+      if(r==='granted')window.addEventListener('deviceorientation',onOrient);
+    }catch(e){}
   }
-
-  finalScore.textContent = score;
-  finalCount.textContent = cookieCount;
-  finalCombo.textContent = 'x' + comboMax;
-  newRecordBadge.style.display = isNew ? 'inline-block' : 'none';
-
-  gameoverScreen.classList.remove('hidden');
+  document.getElementById('ss').classList.add('off');
+  document.getElementById('gos').classList.add('off');
+  document.getElementById('hud').style.display='block';
+  enterScan();
 }
 
-/* ============================================================
-   BUTTON HANDLERS
-============================================================ */
-document.getElementById('start-btn').addEventListener('click', async () => {
+function beginGameplay(){
+  score=0;caught=0;combo=1;comboMax=1;
+  gameActive=true;lastTickDisp=-1;
+  cookies.forEach(c=>scene.remove(c.group));cookies=[];
+  particles.forEach(p=>scene.remove(p));particles=[];
+
+  document.getElementById('sv').textContent='0';
+  document.getElementById('cc').textContent='0';
+  document.getElementById('cv').textContent='x1';
+  document.getElementById('tv').textContent=GAME_SECS;
+  document.getElementById('tv').classList.remove('danger');
+
+  for(let i=0;i<5;i++)setTimeout(()=>spawnCookie(),i*380);
+  if(spawnId)clearInterval(spawnId);
+  spawnId=setInterval(()=>{if(gameActive)spawnCookie();},SPAWN_INTERVAL);
+
+  timerStart=performance.now();
+  if(rafTimer)cancelAnimationFrame(rafTimer);
+  rafTimer=requestAnimationFrame(tickTimer);
+}
+
+function endGame(){
+  gameActive=false;
+  if(spawnId){clearInterval(spawnId);spawnId=null;}
+  if(rafTimer){cancelAnimationFrame(rafTimer);rafTimer=null;}
+  if(comboTimer){clearTimeout(comboTimer);comboTimer=null;}
+  document.getElementById('hud').style.display='none';
+
+  const isNew=score>highScore;
+  if(isNew){highScore=score;localStorage.setItem('cookieHuntHS',highScore);
+    document.getElementById('hsv').textContent=highScore;}
+  document.getElementById('fs').textContent=score;
+  document.getElementById('fc').textContent=caught;
+  document.getElementById('fco').textContent='x'+comboMax;
+  document.getElementById('rec').style.display=isNew?'inline-block':'none';
+  document.getElementById('gos').classList.remove('off');
+}
+
+function restartGame(){
   initAudio();
-  await startCamera();
-  startGame();
-});
-
-document.getElementById('restart-btn').addEventListener('click', () => {
-  initAudio();
-  startGame();
-});
-
-document.getElementById('howto-btn').addEventListener('click', () => {
-  alert('🍪 How to Play:\n\n1. Allow camera access when prompted.\n2. Point your camera around your room.\n3. Cookies will float in the space around you.\n4. TAP cookies to collect them!\n5. Collect fast for combo multipliers.\n6. Golden cookies = 5x points!\n7. 60 seconds on the clock – go!');
-});
-
-/* ============================================================
-   DEVICE ORIENTATION for simulated AR camera movement
-   (When WebXR isn't available, we simulate slight camera drift)
-============================================================ */
-let devAlpha=0, devBeta=0, devGamma=0;
-if (window.DeviceOrientationEvent) {
-  window.addEventListener('deviceorientation', e => {
-    devAlpha = e.alpha || 0;
-    devBeta  = (e.beta  || 0) * Math.PI / 180;
-    devGamma = (e.gamma || 0) * Math.PI / 180;
-  });
+  document.getElementById('gos').classList.add('off');
+  document.getElementById('hud').style.display='block';
+  if(floorSet)beginGameplay(); else enterScan();
 }
 
-// Gentle mouse/touch pan simulation on desktop
-let mouseX=0, mouseY=0;
-window.addEventListener('mousemove', e => {
-  mouseX = (e.clientX / window.innerWidth  - 0.5) * 2;
-  mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
-});
+/* ══════════════════════════════════════════════════════════
+   BUTTONS
+══════════════════════════════════════════════════════════ */
+document.getElementById('start-btn').addEventListener('click',async()=>{
+  initAudio();await startCam();startGame();});
+document.getElementById('restart-btn').addEventListener('click',restartGame);
+document.getElementById('howto-btn').addEventListener('click',()=>{
+  alert('🍪 Cookie Hunt AR\n\n1. Allow camera access.\n2. Point at a table/floor.\n3. Tap "SET FLOOR HERE" to anchor cookies.\n4. Cookies spawn ON the surface — tap them!\n5. Collect fast to build combo multiplier.\n6. 5 cookie types with different points.\n7. Golden 🍪 = 50pts × combo bonus!\n8. 60 seconds — GO!');});
 
-// Override animate to include camera sway
-const _origAnimate = animate;
-(function patchAnimate(){
-  // Already patched — camera drift applied per frame in loop above
-})();
+document.getElementById('hsv').textContent=highScore;
 
-// Camera sway patch (replaces above animate to avoid duplication)
-cancelAnimationFrame(animFrameId);
-animFrameId = null;
-
-function animateFull() {
-  animFrameId = requestAnimationFrame(animateFull);
-  const dt = clock.getDelta();
-  const t  = clock.getElapsedTime();
-
-  // Subtle camera sway to simulate held phone
-  const swayX = mouseX * 0.08 + devGamma * 0.4;
-  const swayY = mouseY * 0.04 + (devBeta - 1.2) * 0.15;
-  camera.rotation.y = THREE.MathUtils.lerp(camera.rotation.y, -swayX * 0.15, 0.05);
-  camera.rotation.x = THREE.MathUtils.lerp(camera.rotation.x, swayY * 0.1, 0.05);
-
-  // Update cookies
-  for (const c of cookies) {
-    if (c.collected) continue;
-
-    c.group.position.y = c.baseY + Math.sin(t * 1.6 + c.phase) * 0.07;
-    c.group.rotation.y += c.rotSpeed * dt;
-
-    const glow = c.group.getObjectByName('glow');
-    if (glow) { glow.rotation.z += 0.8 * dt; glow.lookAt(camera.position); }
-
-    const distToCam = c.group.position.distanceTo(camera.position);
-    const scl = Math.max(0.3, 1.1 - distToCam * 0.08);
-    if (!c.collecting) c.group.scale.setScalar(scl);
-
-    if (c.collecting && c.collectTime) {
-      const elapsed = (Date.now() - c.collectTime) / 500;
-      const s = Math.max(0, (1 + elapsed * 0.4) * (1 - elapsed));
-      c.group.scale.setScalar(s);
-      c.group.position.y += dt * 1.2;
-    }
-
-    if (!c.collecting && Date.now() - c.spawnTime > COOKIE_LIFETIME) {
-      scene.remove(c.group);
-      c.collected = true;
-      cookies = cookies.filter(x => x !== c);
-      if (gameActive) spawnCookie();
-    }
-  }
-
-  updateParticles(dt);
-  renderer.render(scene, camera);
-}
-
-/* ============================================================
-   INIT
-============================================================ */
+/* ══════════════════════════════════════════════════════════
+   BOOT
+══════════════════════════════════════════════════════════ */
 initThree();
-animateFull(); // start render loop (shows black until game starts)
-
+renderLoop();
 </script>
 </body>
 </html>

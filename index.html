@@ -674,6 +674,9 @@ function initThree() {
   scene.add(fill);
 
   window.addEventListener('resize', onResize);
+
+  // Register pointer/tap handler now that renderer.domElement exists
+  renderer.domElement.addEventListener('pointerdown', onPointerDown, { passive: true });
 }
 
 function onResize() {
@@ -944,7 +947,7 @@ function onPointerDown(e) {
   }
 }
 
-renderer.domElement.addEventListener('pointerdown', onPointerDown, { passive: true });
+// NOTE: pointerdown listener is registered in initThree(), after renderer is created.
 
 /* ============================================================
    COLLECT COOKIE
